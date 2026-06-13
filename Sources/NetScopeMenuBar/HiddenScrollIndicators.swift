@@ -10,28 +10,47 @@ extension View {
 private struct HiddenScrollIndicatorConfigurator: NSViewRepresentable {
     func makeNSView(context: Context) -> NSView {
         let view = NSView(frame: .zero)
-        DispatchQueue.main.async {
-            configureScrollView(from: view)
-        }
+        scheduleScrollViewConfiguration(from: view)
         return view
     }
 
     func updateNSView(_ nsView: NSView, context: Context) {
-        DispatchQueue.main.async {
-            configureScrollView(from: nsView)
+        scheduleScrollViewConfiguration(from: nsView)
+    }
+
+    private func scheduleScrollViewConfiguration(from view: NSView) {
+        for delay in [0.0, 0.05, 0.2] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                configureScrollViews(near: view)
+            }
         }
     }
 
-    private func configureScrollView(from view: NSView) {
-        guard let scrollView = view.enclosingScrollView else {
+    private func configureScrollViews(near view: NSView) {
+        if let scrollView = view.enclosingScrollView {
+            hideScrollIndicators(in: scrollView)
+        }
+
+        guard let rootView = view.window?.contentView else {
             return
         }
 
+        for scrollView in scrollViews(in: rootView) {
+            hideScrollIndicators(in: scrollView)
+        }
+    }
+
+    private func hideScrollIndicators(in scrollView: NSScrollView) {
         scrollView.hasVerticalScroller = false
         scrollView.hasHorizontalScroller = false
         scrollView.autohidesScrollers = true
         scrollView.scrollerStyle = .overlay
         scrollView.verticalScroller = nil
         scrollView.horizontalScroller = nil
+    }
+
+    private func scrollViews(in view: NSView) -> [NSScrollView] {
+        let current = (view as? NSScrollView).map { [$0] } ?? []
+        return current + view.subviews.flatMap(scrollViews(in:))
     }
 }
