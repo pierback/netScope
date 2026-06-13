@@ -46,7 +46,7 @@ struct PopoverView: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .scrollIndicators(.visible)
+                .scrollIndicators(.hidden)
             } else if let errorMessage = model.errorMessage {
                 errorState(errorMessage, theme: theme)
             } else {
