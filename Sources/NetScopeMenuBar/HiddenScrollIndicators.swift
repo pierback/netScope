@@ -8,39 +8,95 @@ extension View {
 }
 
 private struct HiddenScrollIndicatorConfigurator: NSViewRepresentable {
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
     func makeNSView(context: Context) -> NSView {
-        let view = NSView(frame: .zero)
-        scheduleScrollViewConfiguration(from: view)
+        let view = HiddenScrollIndicatorProbeView(frame: .zero)
+        view.coordinator = context.coordinator
         return view
     }
 
     func updateNSView(_ nsView: NSView, context: Context) {
-        scheduleScrollViewConfiguration(from: nsView)
-    }
+        guard let nsView = nsView as? HiddenScrollIndicatorProbeView else {
+            assertionFailure("Expected HiddenScrollIndicatorProbeView")
+            return
+        }
 
-    private func scheduleScrollViewConfiguration(from view: NSView) {
-        for delay in [0.0, 0.05, 0.2] {
-            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-                configureScrollViews(near: view)
+        nsView.coordinator = context.coordinator
+        context.coordinator.scheduleScrollViewConfiguration(from: nsView)
+    }
+}
+
+@MainActor
+private final class Coordinator {
+    private static let configurationDelays: [TimeInterval] = [0.0, 0.05, 0.2]
+    private static let maximumVisitedViews = 256
+
+    private var configuredWindowID: ObjectIdentifier?
+    private var scheduleGeneration = 0
+
+    func scheduleScrollViewConfiguration(from view: NSView) {
+        if let window = view.window,
+           configuredWindowID == ObjectIdentifier(window) {
+            return
+        }
+
+        scheduleGeneration += 1
+        let generation = scheduleGeneration
+
+        for delay in Self.configurationDelays {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self, weak view] in
+                guard let self, let view else {
+                    return
+                }
+
+                guard generation == self.scheduleGeneration else {
+                    return
+                }
+
+                if let configuredWindow = Self.configureScrollViews(near: view) {
+                    self.configuredWindowID = ObjectIdentifier(configuredWindow)
+                }
             }
         }
     }
 
-    private func configureScrollViews(near view: NSView) {
+    private static func configureScrollViews(near view: NSView) -> NSWindow? {
         if let scrollView = view.enclosingScrollView {
             hideScrollIndicators(in: scrollView)
+            return view.window
         }
 
         guard let rootView = view.window?.contentView else {
-            return
+            return nil
         }
 
-        for scrollView in scrollViews(in: rootView) {
-            hideScrollIndicators(in: scrollView)
+        var didConfigureScrollView = false
+        var pendingViews = [rootView]
+        var visitedViewCount = 0
+
+        while let currentView = pendingViews.popLast() {
+            visitedViewCount += 1
+
+            guard visitedViewCount <= maximumVisitedViews else {
+                assertionFailure("Popover scroll indicator search exceeded \(maximumVisitedViews) views")
+                return didConfigureScrollView ? view.window : nil
+            }
+
+            if let scrollView = currentView as? NSScrollView {
+                hideScrollIndicators(in: scrollView)
+                didConfigureScrollView = true
+            }
+
+            pendingViews.append(contentsOf: currentView.subviews)
         }
+
+        return didConfigureScrollView ? view.window : nil
     }
 
-    private func hideScrollIndicators(in scrollView: NSScrollView) {
+    private static func hideScrollIndicators(in scrollView: NSScrollView) {
         scrollView.hasVerticalScroller = false
         scrollView.hasHorizontalScroller = false
         scrollView.autohidesScrollers = true
@@ -48,9 +104,19 @@ private struct HiddenScrollIndicatorConfigurator: NSViewRepresentable {
         scrollView.verticalScroller = nil
         scrollView.horizontalScroller = nil
     }
+}
 
-    private func scrollViews(in view: NSView) -> [NSScrollView] {
-        let current = (view as? NSScrollView).map { [$0] } ?? []
-        return current + view.subviews.flatMap(scrollViews(in:))
+@MainActor
+private final class HiddenScrollIndicatorProbeView: NSView {
+    weak var coordinator: Coordinator?
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+
+        guard window != nil else {
+            return
+        }
+
+        coordinator?.scheduleScrollViewConfiguration(from: self)
     }
 }
