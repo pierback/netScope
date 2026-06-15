@@ -32,14 +32,11 @@ private struct HiddenScrollIndicatorConfigurator: NSViewRepresentable {
 @MainActor
 private final class Coordinator {
     private static let configurationDelays: [TimeInterval] = [0.0, 0.05, 0.2]
-    private static let maximumVisitedViews = 256
 
-    private var configuredWindowID: ObjectIdentifier?
     private var scheduleGeneration = 0
 
     func scheduleScrollViewConfiguration(from view: NSView) {
-        if let window = view.window,
-           configuredWindowID == ObjectIdentifier(window) {
+        guard view.window != nil else {
             return
         }
 
@@ -56,44 +53,11 @@ private final class Coordinator {
                     return
                 }
 
-                if let configuredWindow = Self.configureScrollViews(near: view) {
-                    self.configuredWindowID = ObjectIdentifier(configuredWindow)
+                if let scrollView = view.enclosingScrollView {
+                    Self.hideScrollIndicators(in: scrollView)
                 }
             }
         }
-    }
-
-    private static func configureScrollViews(near view: NSView) -> NSWindow? {
-        if let scrollView = view.enclosingScrollView {
-            hideScrollIndicators(in: scrollView)
-            return view.window
-        }
-
-        guard let rootView = view.window?.contentView else {
-            return nil
-        }
-
-        var didConfigureScrollView = false
-        var pendingViews = [rootView]
-        var visitedViewCount = 0
-
-        while let currentView = pendingViews.popLast() {
-            visitedViewCount += 1
-
-            guard visitedViewCount <= maximumVisitedViews else {
-                assertionFailure("Popover scroll indicator search exceeded \(maximumVisitedViews) views")
-                return didConfigureScrollView ? view.window : nil
-            }
-
-            if let scrollView = currentView as? NSScrollView {
-                hideScrollIndicators(in: scrollView)
-                didConfigureScrollView = true
-            }
-
-            pendingViews.append(contentsOf: currentView.subviews)
-        }
-
-        return didConfigureScrollView ? view.window : nil
     }
 
     private static func hideScrollIndicators(in scrollView: NSScrollView) {

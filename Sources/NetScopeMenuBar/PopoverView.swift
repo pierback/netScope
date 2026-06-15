@@ -45,9 +45,9 @@ struct PopoverView: View {
                         topApps(snapshot, theme: theme)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .hiddenAppKitScrollIndicators()
                 }
                 .scrollIndicators(.hidden)
-                .hiddenAppKitScrollIndicators()
             } else if let errorMessage = model.errorMessage {
                 errorState(errorMessage, theme: theme)
             } else {
