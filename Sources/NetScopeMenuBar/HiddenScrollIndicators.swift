@@ -12,52 +12,28 @@ private struct HiddenScrollIndicatorConfigurator: NSViewRepresentable {
         Coordinator()
     }
 
-    func makeNSView(context: Context) -> NSView {
+    func makeNSView(context: Context) -> HiddenScrollIndicatorProbeView {
         let view = HiddenScrollIndicatorProbeView(frame: .zero)
         view.coordinator = context.coordinator
         return view
     }
 
-    func updateNSView(_ nsView: NSView, context: Context) {
-        guard let nsView = nsView as? HiddenScrollIndicatorProbeView else {
-            assertionFailure("Expected HiddenScrollIndicatorProbeView")
-            return
-        }
-
-        nsView.coordinator = context.coordinator
-        context.coordinator.scheduleScrollViewConfiguration(from: nsView)
+    func updateNSView(_ nsView: HiddenScrollIndicatorProbeView, context: Context) {
+        nsView.configureScrollIndicatorsIfReady()
     }
 }
 
 @MainActor
 private final class Coordinator {
-    private static let configurationDelays: [TimeInterval] = [0.0, 0.05, 0.2]
-
-    private var scheduleGeneration = 0
-
-    func scheduleScrollViewConfiguration(from view: NSView) {
-        guard view.window != nil else {
-            return
+    @discardableResult
+    func configureScrollView(containing view: NSView) -> Bool {
+        guard view.window != nil,
+              let scrollView = view.enclosingScrollView else {
+            return false
         }
 
-        scheduleGeneration += 1
-        let generation = scheduleGeneration
-
-        for delay in Self.configurationDelays {
-            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self, weak view] in
-                guard let self, let view else {
-                    return
-                }
-
-                guard generation == self.scheduleGeneration else {
-                    return
-                }
-
-                if let scrollView = view.enclosingScrollView {
-                    Self.hideScrollIndicators(in: scrollView)
-                }
-            }
-        }
+        Self.hideScrollIndicators(in: scrollView)
+        return true
     }
 
     private static func hideScrollIndicators(in scrollView: NSScrollView) {
@@ -73,14 +49,64 @@ private final class Coordinator {
 @MainActor
 private final class HiddenScrollIndicatorProbeView: NSView {
     weak var coordinator: Coordinator?
+    private var didConfigureScrollView = false
+    private var didScheduleFallback = false
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
 
-        guard window != nil else {
+        if window == nil {
+            didConfigureScrollView = false
+            didScheduleFallback = false
+        }
+
+        configureScrollIndicatorsIfReady()
+    }
+
+    override func viewDidMoveToSuperview() {
+        super.viewDidMoveToSuperview()
+
+        configureScrollIndicatorsIfReady()
+    }
+
+    override func layout() {
+        super.layout()
+
+        configureScrollIndicatorsIfReady()
+    }
+
+    func configureScrollIndicatorsIfReady() {
+        guard !didConfigureScrollView,
+              window != nil else {
             return
         }
 
-        coordinator?.scheduleScrollViewConfiguration(from: self)
+        if coordinator?.configureScrollView(containing: self) == true {
+            didConfigureScrollView = true
+            return
+        }
+
+        scheduleSingleFallback()
+    }
+
+    private func scheduleSingleFallback() {
+        guard !didScheduleFallback else {
+            return
+        }
+
+        didScheduleFallback = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self,
+                  !self.didConfigureScrollView,
+                  self.window != nil else {
+                return
+            }
+
+            if self.coordinator?.configureScrollView(containing: self) == true {
+                self.didConfigureScrollView = true
+            } else {
+                assertionFailure("hiddenAppKitScrollIndicators() must be applied inside a ScrollView so the probe can resolve its enclosing NSScrollView.")
+            }
+        }
     }
 }
