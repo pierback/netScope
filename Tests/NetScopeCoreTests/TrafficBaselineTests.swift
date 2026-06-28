@@ -126,6 +126,92 @@ import Testing
     #expect(!FileManager.default.fileExists(atPath: fileURL.path))
 }
 
+@Test func localBaselineStoreClampsPersistedCapsToRuntimeBudget() throws {
+    let directory = FileManager.default.temporaryDirectory
+        .appendingPathComponent("netscope-baseline-tests-\(UUID().uuidString)", isDirectory: true)
+    let fileURL = directory.appendingPathComponent("baseline.json")
+    let store = try LocalTrafficBaselineStore(fileURL: fileURL)
+    let encoder = JSONEncoder()
+    encoder.dateEncodingStrategy = .iso8601
+    let now = Date()
+    let staleDate = now.addingTimeInterval(-(PowerBudget.maximumBaselineAgeSeconds + 60))
+
+    var recordsByAppName: [String: TrafficBaselineRecord] = [
+        "stale": TrafficBaselineRecord(
+            displayName: "stale",
+            sampleCount: 10,
+            averageBytesInPerSecond: 50_000,
+            averageBytesOutPerSecond: 50_000,
+            peakBytesInPerSecond: 50_000,
+            peakBytesOutPerSecond: 50_000,
+            firstSeenAt: staleDate,
+            lastSeenAt: staleDate
+        )
+    ]
+
+    for index in 0...PowerBudget.maximumBaselineApps {
+        let name = "app-\(index)"
+        let seenAt = now.addingTimeInterval(Double(index))
+        recordsByAppName[name] = TrafficBaselineRecord(
+            displayName: name,
+            sampleCount: 1,
+            averageBytesInPerSecond: 40_000,
+            averageBytesOutPerSecond: 40_000,
+            peakBytesInPerSecond: 40_000,
+            peakBytesOutPerSecond: 40_000,
+            firstSeenAt: seenAt,
+            lastSeenAt: seenAt
+        )
+    }
+
+    let persisted = PersistedBaselineFixture(
+        recordsByAppName: recordsByAppName,
+        maximumAgeSeconds: PowerBudget.maximumBaselineAgeSeconds * 10,
+        maximumApps: PowerBudget.maximumBaselineApps * 10
+    )
+
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    try encoder.encode(persisted).write(to: fileURL, options: [.atomic])
+
+    let loaded = try store.load()
+
+    #expect(loaded.maximumAgeSeconds == PowerBudget.maximumBaselineAgeSeconds)
+    #expect(loaded.maximumApps == PowerBudget.maximumBaselineApps)
+    #expect(loaded.recordsByAppName["stale"] == nil)
+    #expect(loaded.recordsByAppName.count == PowerBudget.maximumBaselineApps)
+}
+
+@Test func localBaselineStoreRejectsOversizedFiles() throws {
+    let directory = FileManager.default.temporaryDirectory
+        .appendingPathComponent("netscope-baseline-tests-\(UUID().uuidString)", isDirectory: true)
+    let fileURL = directory.appendingPathComponent("baseline.json")
+    let store = try LocalTrafficBaselineStore(fileURL: fileURL)
+
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    let data = Data(repeating: 0x41, count: PowerBudget.maximumBaselineFileBytes + 1)
+    try data.write(to: fileURL, options: [.atomic])
+
+    do {
+        _ = try store.load()
+        Issue.record("Expected oversized learned baseline file to be rejected.")
+    } catch let error as TrafficBaselineStoreError {
+        switch error {
+        case let .baselineFileTooLarge(limitBytes):
+            #expect(limitBytes == PowerBudget.maximumBaselineFileBytes)
+        case .applicationSupportUnavailable:
+            Issue.record("Expected oversized-file error, got application-support failure.")
+        }
+    } catch {
+        Issue.record("Expected TrafficBaselineStoreError, got \(error).")
+    }
+}
+
+private struct PersistedBaselineFixture: Codable {
+    let recordsByAppName: [String: TrafficBaselineRecord]
+    let maximumAgeSeconds: TimeInterval
+    let maximumApps: Int
+}
+
 private func app(_ name: String, down: Int, up: Int) -> AppTraffic {
     AppTraffic(
         displayName: name,

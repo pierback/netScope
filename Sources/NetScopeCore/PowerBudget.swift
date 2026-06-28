@@ -22,6 +22,7 @@ public enum PowerBudget {
     public static let maximumReusableAppEvidenceAgeSeconds: TimeInterval = 5 * 60
     public static let maximumBaselineAgeSeconds: TimeInterval = 7 * 24 * 60 * 60
     public static let maximumBaselineApps = 80
+    public static let maximumBaselineFileBytes = 64 * 1024
     public static let minimumBaselineSamplesForComparison = 3
     public static let baselineUnusualTrafficMultiplier = 3.0
     public static let baselineMinimumComparableBytesPerSecond = 32 * 1024

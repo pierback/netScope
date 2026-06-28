@@ -11,8 +11,28 @@ public struct TrafficBaseline: Codable, Equatable, Sendable {
         maximumApps: Int = PowerBudget.maximumBaselineApps
     ) {
         self.recordsByAppName = recordsByAppName
-        self.maximumAgeSeconds = maximumAgeSeconds
-        self.maximumApps = maximumApps
+        self.maximumAgeSeconds = min(maximumAgeSeconds, PowerBudget.maximumBaselineAgeSeconds)
+        self.maximumApps = min(max(maximumApps, 1), PowerBudget.maximumBaselineApps)
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let recordsByAppName = try container.decode([String: TrafficBaselineRecord].self, forKey: .recordsByAppName)
+        let maximumAgeSeconds = try container.decodeIfPresent(TimeInterval.self, forKey: .maximumAgeSeconds) ?? PowerBudget.maximumBaselineAgeSeconds
+        let maximumApps = try container.decodeIfPresent(Int.self, forKey: .maximumApps) ?? PowerBudget.maximumBaselineApps
+
+        self.init(
+            recordsByAppName: recordsByAppName,
+            maximumAgeSeconds: maximumAgeSeconds,
+            maximumApps: maximumApps
+        )
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(recordsByAppName, forKey: .recordsByAppName)
+        try container.encode(maximumAgeSeconds, forKey: .maximumAgeSeconds)
+        try container.encode(maximumApps, forKey: .maximumApps)
     }
 
     public var learnedAppCount: Int {
@@ -137,6 +157,12 @@ public struct TrafficBaseline: Codable, Equatable, Sendable {
 
         let total = Int64(currentAverage) * Int64(sampleCount) + Int64(nextValue)
         return Int(total / Int64(sampleCount + 1))
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case recordsByAppName
+        case maximumAgeSeconds
+        case maximumApps
     }
 }
 

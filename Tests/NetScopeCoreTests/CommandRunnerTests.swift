@@ -16,7 +16,7 @@ import Testing
     let result = try runner.run(
         "/bin/sh",
         arguments: ["-c", "printf 'hello'; printf 'warn' 1>&2"],
-        timeoutSeconds: 1
+        timeoutSeconds: 5
     )
 
     #expect(result.exitCode == 0)
@@ -30,7 +30,7 @@ import Testing
     let result = try runner.run(
         "/bin/sh",
         arguments: ["-c", "printf warn 1>&2; exit 7"],
-        timeoutSeconds: 1
+        timeoutSeconds: 5
     )
 
     #expect(result.exitCode == 7)

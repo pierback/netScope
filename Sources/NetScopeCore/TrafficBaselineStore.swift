@@ -8,11 +8,14 @@ public protocol TrafficBaselineStoring {
 
 public enum TrafficBaselineStoreError: Error, CustomStringConvertible {
     case applicationSupportUnavailable
+    case baselineFileTooLarge(limitBytes: Int)
 
     public var description: String {
         switch self {
         case .applicationSupportUnavailable:
             return "Application Support directory is unavailable"
+        case let .baselineFileTooLarge(limitBytes):
+            return "Learned baseline file exceeds \(limitBytes) bytes"
         }
     }
 }
@@ -45,7 +48,7 @@ public struct LocalTrafficBaselineStore: TrafficBaselineStoring {
             return TrafficBaseline()
         }
 
-        let data = try Data(contentsOf: fileURL)
+        let data = try loadBoundedData()
         var baseline = try decoder.decode(TrafficBaseline.self, from: data)
         baseline.prune()
         return baseline
@@ -79,5 +82,20 @@ public struct LocalTrafficBaselineStore: TrafficBaselineStoring {
         return applicationSupport
             .appendingPathComponent("NetScope", isDirectory: true)
             .appendingPathComponent("traffic-baseline.json", isDirectory: false)
+    }
+
+    private func loadBoundedData() throws -> Data {
+        let handle = try FileHandle(forReadingFrom: fileURL)
+        defer {
+            try? handle.close()
+        }
+
+        let limitBytes = PowerBudget.maximumBaselineFileBytes
+        let data = try handle.read(upToCount: limitBytes + 1) ?? Data()
+        guard data.count <= limitBytes else {
+            throw TrafficBaselineStoreError.baselineFileTooLarge(limitBytes: limitBytes)
+        }
+
+        return data
     }
 }
