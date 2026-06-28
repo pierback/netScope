@@ -93,6 +93,13 @@ public enum NetworkPathScope: String, Equatable, Sendable {
     case unknown
 }
 
+public enum WiFiConcern: Equatable, Sendable {
+    case detailsUnavailable
+    case weakSignal
+    case lowSignalToNoiseMargin
+    case lowLinkRate
+}
+
 public struct WiFiHealth: Equatable, Sendable {
     public let interfaceName: String?
     public let ssid: String?
@@ -100,6 +107,7 @@ public struct WiFiHealth: Equatable, Sendable {
     public let noise: Int?
     public let transmitRateMbps: Double?
     public let channel: Int?
+    public let concern: WiFiConcern?
     public let summary: String
 
     public init(
@@ -109,6 +117,7 @@ public struct WiFiHealth: Equatable, Sendable {
         noise: Int?,
         transmitRateMbps: Double?,
         channel: Int?,
+        concern: WiFiConcern?,
         summary: String
     ) {
         self.interfaceName = interfaceName
@@ -117,6 +126,7 @@ public struct WiFiHealth: Equatable, Sendable {
         self.noise = noise
         self.transmitRateMbps = transmitRateMbps
         self.channel = channel
+        self.concern = concern
         self.summary = summary
     }
 }

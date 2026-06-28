@@ -22,22 +22,6 @@ extension PopoverView {
         .glassPanel(theme: theme, cornerRadius: 18)
     }
 
-    func errorState(_ errorMessage: String, theme: NetScopePopoverTheme) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Observation unavailable")
-                .font(NetScopeFont.semibold(14))
-                .foregroundStyle(theme.primaryText)
-            Text(userFacingError(errorMessage))
-                .font(NetScopeFont.medium(12.5))
-                .foregroundStyle(theme.secondaryText)
-                .lineLimit(3)
-                .textSelection(.enabled)
-        }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .glassPanel(theme: theme, cornerRadius: 18)
-    }
-
     func warningNotice(_ message: String, theme: NetScopePopoverTheme) -> some View {
         HStack(alignment: .top, spacing: 8) {
             Image(systemName: "exclamationmark.triangle")
@@ -52,17 +36,6 @@ extension PopoverView {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(.vertical, 1)
-    }
-    func userFacingError(_ errorMessage: String) -> String {
-        if errorMessage.contains("exceeded") && errorMessage.contains("seconds") {
-            return "Network counters timed out. NetScope will keep observing in the background."
-        }
-
-        if errorMessage.contains("no process samples") {
-            return "No app traffic samples were available yet. NetScope will keep observing in the background."
-        }
-
-        return errorMessage
     }
     func footer(theme: NetScopePopoverTheme) -> some View {
         VStack(alignment: .leading, spacing: 0) {

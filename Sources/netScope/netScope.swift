@@ -23,7 +23,7 @@ struct NetScopeCLI {
                 print("Top network apps now:")
                 for (index, app) in diagnosis.topApps.enumerated() {
                     let pid = app.pid.map { " pid \($0)" } ?? ""
-                    print("\(index + 1). \(app.displayName)\(pid): \(formatAppTraffic(app))")
+                    print("\(index + 1). \(app.displayName)\(pid): \(TrafficFormatting.appTraffic(app))")
                 }
             }
         } catch {

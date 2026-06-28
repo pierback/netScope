@@ -58,7 +58,7 @@ public struct SnapshotService: Sendable {
         )
     }
 
-    public func checkNetworkPath(currentAppSnapshot: NetworkSnapshot?, at date: Date = Date()) throws -> NetworkSnapshot {
+    public func checkNetworkPath(currentAppSnapshot: NetworkSnapshot?, at date: Date = Date()) -> NetworkSnapshot {
         let appEvidence = Self.appEvidence(from: currentAppSnapshot, at: date)
         let pathCheck = pathProbe.probe()
         let ping = pathCheck.publicPing

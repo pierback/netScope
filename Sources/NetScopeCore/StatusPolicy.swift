@@ -4,15 +4,14 @@ public struct StatusPolicy: Sendable {
     public init() {}
 
     public func status(for diagnosis: Diagnosis, correlation: RecentCorrelation?) -> NetworkStatus {
-        if effectiveConfidence(for: diagnosis, correlation: correlation) == .high {
+        switch effectiveConfidence(for: diagnosis, correlation: correlation) {
+        case .high:
             return .likelyIssue
-        }
-
-        if effectiveConfidence(for: diagnosis, correlation: correlation) == .medium {
+        case .medium:
             return .possiblePressure
+        case .low:
+            return .normal
         }
-
-        return .normal
     }
 
     public func status(

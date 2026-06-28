@@ -196,18 +196,9 @@ public enum TrafficBaselineFinding: Equatable, Sendable {
     public var summary: String {
         switch self {
         case let .aboveUsual(appName, multiplier, currentBytesPerSecond, usualBytesPerSecond):
-            return "\(appName) is \(formatBaselineMultiplier(multiplier)) above usual (\(formatBitsPerSecond(currentBytesPerSecond)) now vs \(formatBitsPerSecond(usualBytesPerSecond)) learned)."
+            return "\(appName) is \(TrafficFormatting.baselineMultiplier(multiplier)) above usual (\(TrafficFormatting.bitsPerSecond(currentBytesPerSecond)) now vs \(TrafficFormatting.bitsPerSecond(usualBytesPerSecond)) learned)."
         case let .newActiveApp(appName, currentBytesPerSecond):
-            return "\(appName) is newly active at \(formatBitsPerSecond(currentBytesPerSecond))."
+            return "\(appName) is newly active at \(TrafficFormatting.bitsPerSecond(currentBytesPerSecond))."
         }
     }
-}
-
-private func formatBaselineMultiplier(_ multiplier: Double) -> String {
-    let formatter = NumberFormatter()
-    formatter.minimumFractionDigits = 1
-    formatter.maximumFractionDigits = 1
-    formatter.numberStyle = .decimal
-    formatter.locale = Locale(identifier: "en_US_POSIX")
-    return "\(formatter.string(from: NSNumber(value: multiplier)) ?? "\(multiplier)")x"
 }

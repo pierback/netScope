@@ -29,6 +29,10 @@ let package = Package(
             name: "NetScopeCoreTests",
             dependencies: ["NetScopeCore"]
         ),
+        .testTarget(
+            name: "NetScopeMenuBarTests",
+            dependencies: ["NetScopeCore", "NetScopeMenuBar"]
+        ),
     ],
     swiftLanguageModes: [.v6]
 )

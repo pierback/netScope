@@ -11,8 +11,8 @@ public struct DiagnosisEngine: Sendable {
             .prefix(5)
             .map { $0 }
 
-        let totalIn = apps.reduce(0) { $0 + $1.bytesInPerSecond }
-        let totalOut = apps.reduce(0) { $0 + $1.bytesOutPerSecond }
+        let totalIn = apps.totalIncomingBytesPerSecond()
+        let totalOut = apps.totalOutgoingBytesPerSecond()
         let total = totalIn + totalOut
         let pingReason = ping.map(describePing)
         let pathReason = evidence.pathCheck?.summary
@@ -51,8 +51,8 @@ public struct DiagnosisEngine: Sendable {
         let topShare = total == 0 ? 0 : Double(top.totalBytesPerSecond) / Double(total)
         let uploadShare = totalOut == 0 ? 0 : Double(top.bytesOutPerSecond) / Double(totalOut)
         let downloadShare = totalIn == 0 ? 0 : Double(top.bytesInPerSecond) / Double(totalIn)
-        let trafficReason = "Observed \(formatBitsPerSecond(total)) total TCP app traffic across sampled apps."
-        let topReason = "\(top.displayName) is using \(formatAppTraffic(top))."
+        let trafficReason = "Observed \(TrafficFormatting.bitsPerSecond(total)) total TCP app traffic across sampled apps."
+        let topReason = "\(top.displayName) is using \(TrafficFormatting.appTraffic(top))."
 
         if canUseAppPressure, top.bytesOutPerSecond >= 512 * 1024 && uploadShare >= 0.55 {
             return Diagnosis(
@@ -61,7 +61,7 @@ public struct DiagnosisEngine: Sendable {
                 confidence: uploadShare >= 0.75 ? .high : .medium,
                 reasons: compact([
                     topReason,
-                    "\(top.displayName) accounts for \(formatPercent(uploadShare)) of current upload traffic.",
+                    "\(top.displayName) accounts for \(TrafficFormatting.percent(uploadShare)) of current upload traffic.",
                     trafficReason,
                     pingReason,
                     pathReason,
@@ -78,7 +78,7 @@ public struct DiagnosisEngine: Sendable {
                 confidence: downloadShare >= 0.80 ? .high : .medium,
                 reasons: compact([
                     topReason,
-                    "\(top.displayName) accounts for \(formatPercent(downloadShare)) of current download traffic.",
+                    "\(top.displayName) accounts for \(TrafficFormatting.percent(downloadShare)) of current download traffic.",
                     trafficReason,
                     pingReason,
                     pathReason,
@@ -95,7 +95,7 @@ public struct DiagnosisEngine: Sendable {
                 confidence: .medium,
                 reasons: compact([
                     topReason,
-                    "\(top.displayName) accounts for \(formatPercent(topShare)) of all sampled app traffic.",
+                    "\(top.displayName) accounts for \(TrafficFormatting.percent(topShare)) of all sampled app traffic.",
                     trafficReason,
                     pingReason,
                     pathReason,
@@ -115,7 +115,7 @@ public struct DiagnosisEngine: Sendable {
                     pingReason,
                     pathReason,
                     wifiReason,
-                    "\(top.displayName) is the top current network process at \(formatAppTraffic(top)).",
+                    "\(top.displayName) is the top current network process at \(TrafficFormatting.appTraffic(top)).",
                     trafficReason,
                 ]),
                 topApps: topApps
@@ -142,7 +142,7 @@ public struct DiagnosisEngine: Sendable {
                 confidence: .medium,
                 reasons: compact([
                     topReason,
-                    "The top app only accounts for \(formatPercent(topShare)) of sampled traffic.",
+                    "The top app only accounts for \(TrafficFormatting.percent(topShare)) of sampled traffic.",
                     pingReason,
                     pathReason,
                     wifiReason,
@@ -230,24 +230,24 @@ public struct DiagnosisEngine: Sendable {
             return nil
         }
 
-        let summary = wifi.summary
-        guard summary == "Wi-Fi signal is weak."
-            || summary == "Wi-Fi signal-to-noise margin is low."
-            || summary == "Wi-Fi link rate is low." else {
+        switch wifi.concern {
+        case .weakSignal, .lowSignalToNoiseMargin, .lowLinkRate:
+            break
+        case .detailsUnavailable, .none:
             return nil
         }
 
         return Diagnosis(
             kind: .wifi,
-            title: summary,
+            title: wifi.summary,
             confidence: .medium,
-            reasons: [summary],
+            reasons: [wifi.summary],
             topApps: topApps
         )
     }
 
     private func describePing(_ ping: PingResult) -> String {
-        let average = ping.averageMilliseconds.map { "\(formatNumber($0)) ms avg" } ?? "no average latency"
+        let average = ping.averageMilliseconds.map { "\(TrafficFormatting.decimal($0)) ms avg" } ?? "no average latency"
         return "Ping to \(ping.host): \(average), \(formatNumber(ping.packetLossPercent))% packet loss."
     }
 
@@ -257,7 +257,7 @@ public struct DiagnosisEngine: Sendable {
         }
 
         if let elapsed = result.elapsedMilliseconds {
-            return "DNS lookup for \(result.domain): \(result.succeeded ? "succeeded" : "failed") in \(formatNumber(elapsed)) ms."
+            return "DNS lookup for \(result.domain): \(result.succeeded ? "succeeded" : "failed") in \(TrafficFormatting.decimal(elapsed)) ms."
         }
 
         return "DNS lookup for \(result.domain): \(result.succeeded ? "succeeded" : "failed")."
@@ -302,34 +302,8 @@ public struct DiagnosisEngine: Sendable {
     private func compact(_ values: [String?]) -> [String] {
         values.compactMap { $0 }
     }
-}
 
-public func formatAppTraffic(_ app: AppTraffic) -> String {
-    "\(formatBitsPerSecond(app.bytesInPerSecond)) down / \(formatBitsPerSecond(app.bytesOutPerSecond)) up"
-}
-
-public func formatBitsPerSecond(_ bytesPerSecond: Int) -> String {
-    let bits = Double(bytesPerSecond) * 8
-    if bits >= 1_000_000 {
-        return "\(formatNumber(bits / 1_000_000)) Mbps"
+    private func formatNumber(_ value: Double) -> String {
+        TrafficFormatting.decimal(value)
     }
-
-    if bits >= 1_000 {
-        return "\(formatNumber(bits / 1_000)) Kbps"
-    }
-
-    return "\(Int(bits)) bps"
-}
-
-public func formatPercent(_ fraction: Double) -> String {
-    "\(formatNumber(fraction * 100))%"
-}
-
-private func formatNumber(_ value: Double) -> String {
-    let formatter = NumberFormatter()
-    formatter.minimumFractionDigits = 0
-    formatter.maximumFractionDigits = value < 10 ? 1 : 0
-    formatter.numberStyle = .decimal
-    formatter.locale = Locale(identifier: "en_US_POSIX")
-    return formatter.string(from: NSNumber(value: value)) ?? "\(value)"
 }

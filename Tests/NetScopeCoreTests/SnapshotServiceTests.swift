@@ -60,7 +60,7 @@ import Testing
         ping: nil
     )
 
-    let snapshot = try service.checkNetworkPath(
+    let snapshot = service.checkNetworkPath(
         currentAppSnapshot: appSnapshot,
         at: observedAt.addingTimeInterval(60)
     )
@@ -84,7 +84,7 @@ import Testing
         pathProbe: NetworkPathProbe(runner: runner)
     )
 
-    let snapshot = try service.checkNetworkPath(currentAppSnapshot: nil)
+    let snapshot = service.checkNetworkPath(currentAppSnapshot: nil)
 
     #expect(snapshot.kind == .pathCheck)
     #expect(snapshot.apps.isEmpty)
@@ -123,7 +123,7 @@ import Testing
         ping: nil
     )
 
-    let snapshot = try service.checkNetworkPath(currentAppSnapshot: appSnapshot, at: checkAt)
+    let snapshot = service.checkNetworkPath(currentAppSnapshot: appSnapshot, at: checkAt)
 
     #expect(snapshot.apps.isEmpty)
     #expect(snapshot.appEvidenceCapturedAt == nil)

@@ -59,16 +59,7 @@ final class RollingObservationScheduler {
                 return
             }
 
-            switch result {
-            case .sampled:
-                failureCount = 0
-            case .skipped:
-                break
-            case .failed:
-                failureCount += 1
-            }
-
-            schedule()
+            schedule(after: nextInterval(after: result))
         }
     }
 
@@ -89,6 +80,10 @@ final class RollingObservationScheduler {
     }
 
     private var nextObservationInterval: TimeInterval {
+        observationInterval(for: failureCount)
+    }
+
+    private func observationInterval(for failureCount: Int) -> TimeInterval {
         if isForegroundObservationActive && !isPowerConstrained() && failureCount == 0 {
             return PowerBudget.foregroundObservationSampleSeconds
         }
@@ -97,5 +92,19 @@ final class RollingObservationScheduler {
             consecutiveFailures: failureCount,
             isPowerConstrained: isPowerConstrained()
         )
+    }
+
+    func nextInterval(after result: RollingSampleResult) -> TimeInterval {
+        switch result {
+        case .sampled:
+            failureCount = 0
+            return nextObservationInterval
+        case .skipped:
+            return nextObservationInterval
+        case .failed:
+            failureCount += 1
+        }
+
+        return observationInterval(for: failureCount)
     }
 }

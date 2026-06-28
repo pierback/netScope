@@ -80,8 +80,8 @@ public struct SnapshotHistory: Equatable, Sendable {
             .map { snapshot in
             TrafficTrendPoint(
                 capturedAt: snapshot.capturedAt,
-                bytesInPerSecond: snapshot.apps.reduce(0) { $0 + $1.bytesInPerSecond },
-                bytesOutPerSecond: snapshot.apps.reduce(0) { $0 + $1.bytesOutPerSecond }
+                bytesInPerSecond: snapshot.apps.totalIncomingBytesPerSecond(),
+                bytesOutPerSecond: snapshot.apps.totalOutgoingBytesPerSecond()
             )
         }
     }

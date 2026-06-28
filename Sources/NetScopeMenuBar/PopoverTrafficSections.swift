@@ -118,29 +118,7 @@ extension PopoverView {
         }
     }
     func compactAppTraffic(_ app: AppTraffic) -> String {
-        "\(formatCompactBitsPerSecond(app.bytesInPerSecond)) dn / \(formatCompactBitsPerSecond(app.bytesOutPerSecond)) up"
-    }
-
-    func formatCompactBitsPerSecond(_ bytesPerSecond: Int) -> String {
-        let bits = Double(bytesPerSecond) * 8
-        if bits >= 1_000_000 {
-            return "\(formatCompactNumber(bits / 1_000_000))M"
-        }
-
-        if bits >= 1_000 {
-            return "\(formatCompactNumber(bits / 1_000))K"
-        }
-
-        return "\(Int(bits))"
-    }
-
-    func formatCompactNumber(_ value: Double) -> String {
-        let formatter = NumberFormatter()
-        formatter.minimumFractionDigits = 0
-        formatter.maximumFractionDigits = value < 10 ? 1 : 0
-        formatter.numberStyle = .decimal
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        return formatter.string(from: NSNumber(value: value)) ?? "\(value)"
+        TrafficFormatting.appTraffic(app, style: .compact)
     }
 
     func progress(for app: AppTraffic, maxTraffic: Int) -> Double {

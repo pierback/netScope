@@ -22,6 +22,7 @@ public struct WiFiHealthProbe: Sendable {
                 noise: nil,
                 transmitRateMbps: nil,
                 channel: nil,
+                concern: nil,
                 summary: "Wi-Fi interface is unavailable."
             )
         }
@@ -31,7 +32,8 @@ public struct WiFiHealthProbe: Sendable {
         let rate = interface.transmitRate()
         let channel = interface.wlanChannel()?.channelNumber
         let ssid = privacyMode == .includeNetworkName ? interface.ssid() : nil
-        let summary = Self.summary(rssi: rssi, noise: noise, transmitRateMbps: rate, ssid: ssid)
+        let concern = Self.concern(rssi: rssi, noise: noise, transmitRateMbps: rate, ssid: ssid)
+        let summary = Self.summary(for: concern)
 
         return WiFiHealth(
             interfaceName: interface.interfaceName,
@@ -40,6 +42,7 @@ public struct WiFiHealthProbe: Sendable {
             noise: noise == 0 ? nil : noise,
             transmitRateMbps: rate <= 0 ? nil : rate,
             channel: channel == 0 ? nil : channel,
+            concern: concern,
             summary: summary
         )
         #else
@@ -50,28 +53,44 @@ public struct WiFiHealthProbe: Sendable {
             noise: nil,
             transmitRateMbps: nil,
             channel: nil,
+            concern: nil,
             summary: "Wi-Fi health is unavailable on this system."
         )
         #endif
     }
 
-    public static func summary(rssi: Int, noise: Int, transmitRateMbps: Double, ssid: String?) -> String {
+    public static func concern(rssi: Int, noise: Int, transmitRateMbps: Double, ssid: String?) -> WiFiConcern? {
         if rssi == 0 && noise == 0 && ssid == nil {
-            return "Wi-Fi details unavailable; Location Services permission may be required."
+            return .detailsUnavailable
         }
 
         if rssi <= -80 {
-            return "Wi-Fi signal is weak."
+            return .weakSignal
         }
 
         if noise != 0 && rssi - noise < 25 {
-            return "Wi-Fi signal-to-noise margin is low."
+            return .lowSignalToNoiseMargin
         }
 
         if transmitRateMbps > 0 && transmitRateMbps < 100 {
-            return "Wi-Fi link rate is low."
+            return .lowLinkRate
         }
 
-        return "Wi-Fi link looks usable."
+        return nil
+    }
+
+    public static func summary(for concern: WiFiConcern?) -> String {
+        switch concern {
+        case .detailsUnavailable:
+            return "Wi-Fi details unavailable; Location Services permission may be required."
+        case .weakSignal:
+            return "Wi-Fi signal is weak."
+        case .lowSignalToNoiseMargin:
+            return "Wi-Fi signal-to-noise margin is low."
+        case .lowLinkRate:
+            return "Wi-Fi link rate is low."
+        case .none:
+            return "Wi-Fi link looks usable."
+        }
     }
 }

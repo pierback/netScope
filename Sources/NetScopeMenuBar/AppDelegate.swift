@@ -49,9 +49,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             )
         )
 
-        statusCancellable = model.$status.sink { [weak self] status in
-            self?.renderStatus(status)
-        }
+        statusCancellable = model.$state
+            .map(\.status)
+            .removeDuplicates()
+            .sink { [weak self] status in
+                self?.renderStatus(status)
+            }
 
         rollingObservationScheduler.start()
     }

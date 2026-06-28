@@ -50,8 +50,6 @@ struct PopoverView: View {
                     // The AppKit probe must stay inside the ScrollView content to resolve the enclosing NSScrollView.
                     .hiddenAppKitScrollIndicators()
                 }
-            } else if let errorMessage = model.errorMessage {
-                errorState(errorMessage, theme: theme)
             } else {
                 VStack(alignment: .leading, spacing: 12) {
                     emptyState(theme: theme)

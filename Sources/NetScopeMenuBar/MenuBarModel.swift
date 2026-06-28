@@ -10,19 +10,10 @@ enum RollingSampleResult: Sendable {
 
 @MainActor
 final class MenuBarModel: ObservableObject {
-    @Published private(set) var snapshot: NetworkSnapshot?
-    @Published private(set) var lastPathCheck: NetworkSnapshot?
-    @Published private(set) var correlation: RecentCorrelation?
-    @Published private(set) var status: NetworkStatus = .normal
-    @Published private(set) var effectiveConfidence: Confidence = .low
+    @Published private(set) var state: ObservationState
     @Published private(set) var isLoading = false
-    @Published private(set) var errorMessage: String?
     @Published private(set) var rollingWarning: String?
-    @Published private(set) var baselineAssessment: TrafficBaselineAssessment?
     @Published private(set) var baselineWarning: String?
-    @Published private(set) var learnedBaselineAppCount = 0
-    @Published private(set) var trafficTrend: [TrafficTrendPoint] = []
-    @Published private(set) var lastRollingSampleAt: Date?
 
     private let snapshotService: SnapshotService
     private let baselineStore: TrafficBaselineStoring?
@@ -43,7 +34,43 @@ final class MenuBarModel: ObservableObject {
             self.observationSession = ObservationSession(statusPolicy: statusPolicy)
             self.baselineWarning = "Could not read learned baseline."
         }
-        apply(observationSession.state)
+        self.state = observationSession.state
+    }
+
+    var snapshot: NetworkSnapshot? {
+        state.snapshot
+    }
+
+    var lastPathCheck: NetworkSnapshot? {
+        state.lastPathCheck
+    }
+
+    var correlation: RecentCorrelation? {
+        state.correlation
+    }
+
+    var status: NetworkStatus {
+        state.status
+    }
+
+    var effectiveConfidence: Confidence {
+        state.effectiveConfidence
+    }
+
+    var learnedBaselineAppCount: Int {
+        state.learnedBaselineAppCount
+    }
+
+    var baselineAssessment: TrafficBaselineAssessment? {
+        state.baselineAssessment
+    }
+
+    var trafficTrend: [TrafficTrendPoint] {
+        state.trafficTrend
+    }
+
+    var lastRollingSampleAt: Date? {
+        state.lastRollingSampleAt
     }
 
     func refresh() {
@@ -52,24 +79,21 @@ final class MenuBarModel: ObservableObject {
         }
 
         isLoading = true
-        errorMessage = nil
         rollingWarning = nil
         let service = snapshotService
 
         Task {
-            do {
-                let currentAppObservation = observationSession.latestAppObservationForPathCheck
-                let nextSnapshot = try await Task.detached(priority: .utility) {
-                    try service.checkNetworkPath(currentAppSnapshot: currentAppObservation)
-                }.value
-
-                let update = observationSession.applyPathCheckSnapshot(nextSnapshot)
-                apply(update.state)
-                isLoading = false
-            } catch {
-                errorMessage = String(describing: error)
+            defer {
                 isLoading = false
             }
+
+            let currentAppObservation = observationSession.latestAppObservationForPathCheck
+            let nextSnapshot = await Task.detached(priority: .utility) {
+                service.checkNetworkPath(currentAppSnapshot: currentAppObservation)
+            }.value
+
+            let update = observationSession.applyPathCheckSnapshot(nextSnapshot)
+            apply(update.state)
         }
     }
 
@@ -83,6 +107,10 @@ final class MenuBarModel: ObservableObject {
         let service = snapshotService
 
         Task {
+            defer {
+                isRollingSampleInFlight = false
+            }
+
             do {
                 let rollingSnapshot = try await Task.detached(priority: .utility) {
                     try service.captureRollingAppCounters()
@@ -92,11 +120,9 @@ final class MenuBarModel: ObservableObject {
                 apply(update.state)
                 saveBaselineIfNeeded(update)
                 rollingWarning = nil
-                isRollingSampleInFlight = false
                 completion?(.sampled)
             } catch {
                 rollingWarning = "App counters unavailable. Keeping the last observed counters."
-                isRollingSampleInFlight = false
                 completion?(.failed)
             }
         }
@@ -122,15 +148,7 @@ final class MenuBarModel: ObservableObject {
     }
 
     private func apply(_ state: ObservationState) {
-        snapshot = state.snapshot
-        lastPathCheck = state.lastPathCheck
-        correlation = state.correlation
-        status = state.status
-        effectiveConfidence = state.effectiveConfidence
-        baselineAssessment = state.baselineAssessment
-        learnedBaselineAppCount = state.learnedBaselineAppCount
-        trafficTrend = state.trafficTrend
-        lastRollingSampleAt = state.lastRollingSampleAt
+        self.state = state
     }
 
     private func saveBaselineIfNeeded(_ update: ObservationUpdate) {

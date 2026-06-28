@@ -6,7 +6,7 @@ extension PopoverView {
         HStack(alignment: .top, spacing: 0) {
             metricColumn(
                 title: "Down",
-                value: formatBitsPerSecond(totalIncomingBytesPerSecond(snapshot)),
+                value: TrafficFormatting.bitsPerSecond(totalIncomingBytesPerSecond(snapshot)),
                 subtitle: appEvidenceSubtitle(snapshot),
                 accent: theme.warning,
                 theme: theme
@@ -14,7 +14,7 @@ extension PopoverView {
             metricDivider(theme: theme)
             metricColumn(
                 title: "Up",
-                value: formatBitsPerSecond(totalOutgoingBytesPerSecond(snapshot)),
+                value: TrafficFormatting.bitsPerSecond(totalOutgoingBytesPerSecond(snapshot)),
                 subtitle: appEvidenceSubtitle(snapshot),
                 accent: theme.success,
                 theme: theme
@@ -291,9 +291,9 @@ extension PopoverView {
     }
 
     func pathDetails(_ check: NetworkPathCheck) -> String {
-        let gateway = check.gatewayPing.flatMap { $0.averageMilliseconds }.map { "\(formatCompactNumber($0))ms gw" } ?? "-- gw"
-        let publicPing = check.publicPing.flatMap { $0.averageMilliseconds }.map { "\(formatCompactNumber($0))ms pub" } ?? "-- pub"
-        let dns = check.dnsLookup?.elapsedMilliseconds.map { "\(formatCompactNumber($0))ms dns" } ?? "-- dns"
+        let gateway = check.gatewayPing.flatMap { $0.averageMilliseconds }.map { "\(TrafficFormatting.decimal($0))ms gw" } ?? "-- gw"
+        let publicPing = check.publicPing.flatMap { $0.averageMilliseconds }.map { "\(TrafficFormatting.decimal($0))ms pub" } ?? "-- pub"
+        let dns = check.dnsLookup?.elapsedMilliseconds.map { "\(TrafficFormatting.decimal($0))ms dns" } ?? "-- dns"
         return "\(gateway) / \(publicPing) / \(dns)"
     }
 
@@ -304,17 +304,17 @@ extension PopoverView {
 
         let rssi = wifi.rssi.map { "\($0)dBm" } ?? "--dBm"
         let noise = wifi.noise.map { "\($0)dBm noise" } ?? "-- noise"
-        let rate = wifi.transmitRateMbps.map { "\(formatCompactNumber($0))Mbps" } ?? "--Mbps"
+        let rate = wifi.transmitRateMbps.map { "\(TrafficFormatting.decimal($0))Mbps" } ?? "--Mbps"
         let channel = wifi.channel.map { "ch \($0)" } ?? "ch --"
         return "\(rssi) / \(noise) / \(rate) / \(channel)"
     }
 
     func totalIncomingBytesPerSecond(_ snapshot: NetworkSnapshot) -> Int {
-        snapshot.apps.reduce(0) { $0 + $1.bytesInPerSecond }
+        snapshot.apps.totalIncomingBytesPerSecond()
     }
 
     func totalOutgoingBytesPerSecond(_ snapshot: NetworkSnapshot) -> Int {
-        snapshot.apps.reduce(0) { $0 + $1.bytesOutPerSecond }
+        snapshot.apps.totalOutgoingBytesPerSecond()
     }
 
     func pingValue(_ snapshot: NetworkSnapshot) -> String {
@@ -322,7 +322,7 @@ extension PopoverView {
             return "--"
         }
 
-        return "\(formatCompactNumber(average)) ms"
+        return "\(TrafficFormatting.decimal(average)) ms"
     }
 
     func packetLossValue(_ snapshot: NetworkSnapshot) -> String {
@@ -330,7 +330,7 @@ extension PopoverView {
             return "not sampled"
         }
 
-        return "\(formatCompactNumber(packetLoss))% loss"
+        return "\(TrafficFormatting.decimal(packetLoss))% loss"
     }
 
     func latestPing(_ snapshot: NetworkSnapshot) -> PingResult? {

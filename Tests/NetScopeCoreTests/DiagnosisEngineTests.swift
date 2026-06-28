@@ -230,6 +230,7 @@ import Testing
         noise: -90,
         transmitRateMbps: 400,
         channel: 11,
+        concern: .weakSignal,
         summary: "Wi-Fi signal is weak."
     )
 
@@ -239,4 +240,34 @@ import Testing
 
     #expect(diagnosis.kind == .appUploadPressure(appName: "Dropbox"))
     #expect(diagnosis.confidence == .high)
+}
+
+@Test func wifiDiagnosisUsesStructuredConcernInsteadOfSummaryCopy() {
+    let apps = [
+        AppTraffic(
+            displayName: "Safari",
+            pid: 43,
+            bytesInPerSecond: 20_000,
+            bytesOutPerSecond: 10_000,
+            retransmitsPerSecond: 0
+        )
+    ]
+    let wifi = WiFiHealth(
+        interfaceName: "en0",
+        ssid: nil,
+        rssi: -60,
+        noise: -95,
+        transmitRateMbps: 72,
+        channel: 44,
+        concern: .lowLinkRate,
+        summary: "Custom copy for a weak Wi-Fi link."
+    )
+
+    let diagnosis = DiagnosisEngine().diagnose(
+        evidence: DiagnosisEvidence(apps: apps, appEvidenceSource: .freshlySampled, wifi: wifi)
+    )
+
+    #expect(diagnosis.kind == .wifi)
+    #expect(diagnosis.title == "Custom copy for a weak Wi-Fi link.")
+    #expect(diagnosis.reasons == ["Custom copy for a weak Wi-Fi link."])
 }

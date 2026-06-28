@@ -125,10 +125,10 @@ import Testing
             "1.1.1.1": pingOutput(host: "1.1.1.1", loss: 0, avg: 18),
         ],
         dnsOutput: "17.253.144.10\n",
-        delayByHost: ["1.1.1.1": 0.04]
+        delayByHost: ["1.1.1.1": 0.2]
     )
 
-    let check = NetworkPathProbe(runner: runner, maximumPathCheckSeconds: 0.03).probe()
+    let check = NetworkPathProbe(runner: runner, maximumPathCheckSeconds: 0.15).probe()
 
     #expect(check.gatewayPing != nil)
     #expect(check.publicPing != nil)
