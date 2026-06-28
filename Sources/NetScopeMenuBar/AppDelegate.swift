@@ -36,7 +36,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
         popover.behavior = .transient
         popover.delegate = self
-        popover.contentSize = NSSize(width: 420, height: 680)
+        popover.contentSize = PopoverView.preferredContentSize
         popover.contentViewController = NSHostingController(
             rootView: PopoverView(
                 model: model,
@@ -135,8 +135,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     }
 
     private func closePopover() {
+        guard popover.isShown else {
+            return
+        }
+
         popover.performClose(nil)
-        markPopoverClosedAndResumeBackgroundObservation()
     }
 
     func applicationDidResignActive(_ notification: Notification) {

@@ -3,6 +3,8 @@ import SwiftUI
 import NetScopeCore
 
 struct PopoverView: View {
+    static let preferredContentSize = CGSize(width: 420, height: 680)
+
     @ObservedObject var model: MenuBarModel
     let onClearBaseline: () -> Void
     let onQuit: () -> Void
@@ -45,9 +47,9 @@ struct PopoverView: View {
                         topApps(snapshot, theme: theme)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    // The AppKit probe must stay inside the ScrollView content to resolve the enclosing NSScrollView.
                     .hiddenAppKitScrollIndicators()
                 }
-                .scrollIndicators(.hidden)
             } else if let errorMessage = model.errorMessage {
                 errorState(errorMessage, theme: theme)
             } else {
@@ -65,7 +67,11 @@ struct PopoverView: View {
             footer(theme: theme)
         }
         .padding(18)
-        .frame(width: 420, height: 680, alignment: .topLeading)
+        .frame(
+            width: Self.preferredContentSize.width,
+            height: Self.preferredContentSize.height,
+            alignment: .topLeading
+        )
         .background(theme.background)
         .foregroundStyle(theme.primaryText)
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))

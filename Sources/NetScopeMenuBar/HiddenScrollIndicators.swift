@@ -8,14 +8,8 @@ extension View {
 }
 
 private struct HiddenScrollIndicatorConfigurator: NSViewRepresentable {
-    func makeCoordinator() -> Coordinator {
-        Coordinator()
-    }
-
     func makeNSView(context: Context) -> HiddenScrollIndicatorProbeView {
-        let view = HiddenScrollIndicatorProbeView(frame: .zero)
-        view.coordinator = context.coordinator
-        return view
+        HiddenScrollIndicatorProbeView(frame: .zero)
     }
 
     func updateNSView(_ nsView: HiddenScrollIndicatorProbeView, context: Context) {
@@ -24,40 +18,18 @@ private struct HiddenScrollIndicatorConfigurator: NSViewRepresentable {
 }
 
 @MainActor
-private final class Coordinator {
-    @discardableResult
-    func configureScrollView(containing view: NSView) -> Bool {
-        guard view.window != nil,
-              let scrollView = view.enclosingScrollView else {
-            return false
-        }
-
-        Self.hideScrollIndicators(in: scrollView)
-        return true
-    }
-
-    private static func hideScrollIndicators(in scrollView: NSScrollView) {
-        scrollView.hasVerticalScroller = false
-        scrollView.hasHorizontalScroller = false
-        scrollView.autohidesScrollers = true
-        scrollView.scrollerStyle = .overlay
-        scrollView.verticalScroller = nil
-        scrollView.horizontalScroller = nil
-    }
-}
-
-@MainActor
 private final class HiddenScrollIndicatorProbeView: NSView {
-    weak var coordinator: Coordinator?
-    private var didConfigureScrollView = false
-    private var didScheduleFallback = false
+    private static let maximumFallbackChecks = 3
+
+    private weak var configuredScrollView: NSScrollView?
+    private var fallbackCheckCount = 0
+    private var isFallbackCheckQueued = false
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
 
         if window == nil {
-            didConfigureScrollView = false
-            didScheduleFallback = false
+            resetConfigurationState()
         }
 
         configureScrollIndicatorsIfReady()
@@ -76,37 +48,81 @@ private final class HiddenScrollIndicatorProbeView: NSView {
     }
 
     func configureScrollIndicatorsIfReady() {
-        guard !didConfigureScrollView,
-              window != nil else {
+        guard window != nil else {
             return
         }
 
-        if coordinator?.configureScrollView(containing: self) == true {
-            didConfigureScrollView = true
+        if configureEnclosingScrollViewIfAvailable() {
             return
         }
 
-        scheduleSingleFallback()
+        scheduleFallbackCheckIfNeeded()
     }
 
-    private func scheduleSingleFallback() {
-        guard !didScheduleFallback else {
+    private func resetConfigurationState() {
+        configuredScrollView = nil
+        fallbackCheckCount = 0
+        isFallbackCheckQueued = false
+    }
+
+    private func scheduleFallbackCheckIfNeeded() {
+        guard !isFallbackCheckQueued,
+              fallbackCheckCount < Self.maximumFallbackChecks else {
             return
         }
 
-        didScheduleFallback = true
+        isFallbackCheckQueued = true
         DispatchQueue.main.async { [weak self] in
-            guard let self,
-                  !self.didConfigureScrollView,
-                  self.window != nil else {
+            guard let self else {
                 return
             }
 
-            if self.coordinator?.configureScrollView(containing: self) == true {
-                self.didConfigureScrollView = true
-            } else {
-                assertionFailure("hiddenAppKitScrollIndicators() must be applied inside a ScrollView so the probe can resolve its enclosing NSScrollView.")
+            self.isFallbackCheckQueued = false
+
+            guard self.window != nil else {
+                return
             }
+
+            self.fallbackCheckCount += 1
+            guard !self.configureEnclosingScrollViewIfAvailable() else {
+                return
+            }
+
+            self.scheduleFallbackCheckIfNeeded()
         }
+    }
+
+    @discardableResult
+    private func configureEnclosingScrollViewIfAvailable() -> Bool {
+        guard let scrollView = enclosingScrollView else {
+            return false
+        }
+
+        if configuredScrollView !== scrollView || !Self.areScrollIndicatorsHidden(in: scrollView) {
+            Self.hideScrollIndicators(in: scrollView)
+        }
+
+        configuredScrollView = scrollView
+        fallbackCheckCount = 0
+        isFallbackCheckQueued = false
+        return true
+    }
+
+    private static func areScrollIndicatorsHidden(in scrollView: NSScrollView) -> Bool {
+        scrollView.hasVerticalScroller == false &&
+        scrollView.hasHorizontalScroller == false &&
+        scrollView.verticalScroller == nil &&
+        scrollView.horizontalScroller == nil &&
+        scrollView.autohidesScrollers &&
+        scrollView.scrollerStyle == .overlay
+    }
+
+    private static func hideScrollIndicators(in scrollView: NSScrollView) {
+        scrollView.hasVerticalScroller = false
+        scrollView.hasHorizontalScroller = false
+        scrollView.autohidesScrollers = true
+        scrollView.scrollerStyle = .overlay
+        scrollView.verticalScroller = nil
+        scrollView.horizontalScroller = nil
     }
 }
