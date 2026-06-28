@@ -58,6 +58,39 @@ import NetScopeCore
 }
 
 @MainActor
+@Test func initWarnsWhenDefaultBaselineStoreCannotBeCreated() {
+    let model = MenuBarModel(
+        baselineStoreFactory: {
+            throw TrafficBaselineStoreError.applicationSupportUnavailable
+        }
+    )
+
+    #expect(model.baselineWarning == "Could not enable learned baseline.")
+    #expect(model.learnedBaselineAppCount == 0)
+}
+
+@MainActor
+@Test func learnedBaselineSavesOffMainThread() async {
+    let store = RecordingBaselineStore()
+    let model = MenuBarModel(
+        snapshotService: SnapshotService(sampler: NettopSampler(runner: SuccessfulNettopRunner())),
+        baselineStore: store
+    )
+
+    var result: RollingSampleResult?
+    model.recordRollingAppCounterSample { outcome in
+        result = outcome
+    }
+
+    await waitUntil { result != nil && store.saveCallCount == 1 }
+
+    #expect(result == .sampled)
+    #expect(store.saveCallCount == 1)
+    #expect(store.lastSaveWasOnMainThread == false)
+    #expect(model.baselineWarning == nil)
+}
+
+@MainActor
 private func waitUntil(
     timeoutNanoseconds: UInt64 = 200_000_000,
     condition: @MainActor @Sendable () -> Bool
@@ -82,4 +115,35 @@ private struct FailingNettopRunner: CommandRunning, Sendable {
     func run(_ executable: String, arguments: [String]) throws -> CommandResult {
         throw CommandRunnerError.timedOut(executable: executable, timeoutSeconds: 10)
     }
+}
+
+private final class RecordingBaselineStore: TrafficBaselineStoring, @unchecked Sendable {
+    private let lock = NSLock()
+    private var recordedSaveCallCount = 0
+    private var recordedLastSaveWasOnMainThread = true
+
+    var saveCallCount: Int {
+        lock.withLock {
+            recordedSaveCallCount
+        }
+    }
+
+    var lastSaveWasOnMainThread: Bool {
+        lock.withLock {
+            recordedLastSaveWasOnMainThread
+        }
+    }
+
+    func load() throws -> TrafficBaseline {
+        TrafficBaseline()
+    }
+
+    func save(_ baseline: TrafficBaseline) throws {
+        lock.withLock {
+            recordedSaveCallCount += 1
+            recordedLastSaveWasOnMainThread = Thread.isMainThread
+        }
+    }
+
+    func clear() throws {}
 }

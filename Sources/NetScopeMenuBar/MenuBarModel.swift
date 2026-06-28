@@ -16,19 +16,31 @@ final class MenuBarModel: ObservableObject {
     @Published private(set) var baselineWarning: String?
 
     private let snapshotService: SnapshotService
-    private let baselineStore: TrafficBaselineStoring?
+    private let baselinePersistence: BaselinePersistenceController?
     private var observationSession: ObservationSession
     private var isRollingSampleInFlight = false
 
     init(
         snapshotService: SnapshotService = SnapshotService(),
         statusPolicy: StatusPolicy = StatusPolicy(),
-        baselineStore: TrafficBaselineStoring? = MenuBarModel.makeDefaultBaselineStore()
+        baselineStore: (any TrafficBaselineStoring)? = nil,
+        baselineStoreFactory: @escaping BaselineStoreFactory = { try LocalTrafficBaselineStore() }
     ) {
         self.snapshotService = snapshotService
-        self.baselineStore = baselineStore
+        let resolvedBaselineStore: (any TrafficBaselineStoring)?
+        if let baselineStore {
+            resolvedBaselineStore = baselineStore
+        } else {
+            do {
+                resolvedBaselineStore = try baselineStoreFactory()
+            } catch {
+                resolvedBaselineStore = nil
+                self.baselineWarning = "Could not enable learned baseline."
+            }
+        }
+        self.baselinePersistence = resolvedBaselineStore.map { BaselinePersistenceController(store: $0) }
         do {
-            let loadedBaseline = try baselineStore?.load() ?? TrafficBaseline()
+            let loadedBaseline = try resolvedBaselineStore?.load() ?? TrafficBaseline()
             self.observationSession = ObservationSession(baseline: loadedBaseline, statusPolicy: statusPolicy)
         } catch {
             self.observationSession = ObservationSession(statusPolicy: statusPolicy)
@@ -131,19 +143,13 @@ final class MenuBarModel: ObservableObject {
     func clearBaseline() {
         let update = observationSession.clearBaseline()
         apply(update.state)
-        do {
-            try baselineStore?.clear()
-            baselineWarning = nil
-        } catch {
-            baselineWarning = "Could not clear learned baseline."
+        baselineWarning = nil
+        guard let baselinePersistence else {
+            return
         }
-    }
 
-    private static func makeDefaultBaselineStore() -> TrafficBaselineStoring? {
-        do {
-            return try LocalTrafficBaselineStore()
-        } catch {
-            return nil
+        baselinePersistence.clear { [weak self] warning in
+            self?.baselineWarning = warning
         }
     }
 
@@ -152,15 +158,14 @@ final class MenuBarModel: ObservableObject {
     }
 
     private func saveBaselineIfNeeded(_ update: ObservationUpdate) {
-        guard update.baselineChanged else {
+        guard update.baselineChanged,
+              let baselinePersistence else {
             return
         }
 
-        do {
-            try baselineStore?.save(observationSession.baselineForPersistence)
-            baselineWarning = nil
-        } catch {
-            baselineWarning = "Could not save learned baseline."
+        let baseline = observationSession.baselineForPersistence
+        baselinePersistence.save(baseline) { [weak self] warning in
+            self?.baselineWarning = warning
         }
     }
 }
