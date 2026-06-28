@@ -21,10 +21,10 @@ public struct SnapshotService: Sendable {
         self.diagnosisEngine = diagnosisEngine
     }
 
-    public func capture(at date: Date = Date()) throws -> NetworkSnapshot {
+    public func captureFullCheck(at date: Date = Date()) throws -> NetworkSnapshot {
         let apps = try sampler.sample()
         let ping = try? pingProbe.probe()
-        let wifi = wifiProbe.probe(privacyMode: .includeNetworkName)
+        let wifi = wifiProbe.probe(privacyMode: .linkMetricsOnly)
         let diagnosis = diagnosisEngine.diagnose(evidence: DiagnosisEvidence(apps: apps, ping: ping, wifi: wifi))
         let observationID = UUID()
 
@@ -37,6 +37,25 @@ public struct SnapshotService: Sendable {
             appEvidenceSource: .freshlySampled,
             appObservationID: observationID,
             ping: ping,
+            wifi: wifi
+        )
+    }
+
+    public func captureInteractiveObservation(at date: Date = Date()) throws -> NetworkSnapshot {
+        let apps = try sampler.sample()
+        let wifi = wifiProbe.probe(privacyMode: .linkMetricsOnly)
+        let diagnosis = diagnosisEngine.diagnose(evidence: DiagnosisEvidence(apps: apps, wifi: wifi))
+        let observationID = UUID()
+
+        return NetworkSnapshot(
+            capturedAt: date,
+            kind: .interactive,
+            diagnosis: diagnosis,
+            apps: apps,
+            appEvidenceCapturedAt: date,
+            appEvidenceSource: .freshlySampled,
+            appObservationID: observationID,
+            ping: nil,
             wifi: wifi
         )
     }
@@ -62,7 +81,7 @@ public struct SnapshotService: Sendable {
         let appEvidence = Self.appEvidence(from: currentAppSnapshot, at: date)
         let pathCheck = pathProbe.probe()
         let ping = pathCheck.publicPing
-        let wifi = wifiProbe.probe(privacyMode: .includeNetworkName)
+        let wifi = wifiProbe.probe(privacyMode: .linkMetricsOnly)
         let diagnosis = diagnosisEngine.diagnose(
             evidence: DiagnosisEvidence(
                 apps: appEvidence.apps,

@@ -23,7 +23,7 @@ extension PopoverView {
                         systemSymbolName: "arrow.clockwise",
                         tooltip: "Check network path",
                         onPress: {
-                            model.refresh()
+                            model.checkNetworkPath()
                         }
                     )
                 }
@@ -42,14 +42,14 @@ extension PopoverView {
             return "Checking network path..."
         }
 
-        guard let snapshot = model.snapshot else {
+        guard let snapshot = model.state.snapshot else {
             return "Rolling counters every 60s · ping on path check"
         }
 
         let timestamp = Self.headerTimeFormatter.string(from: snapshot.capturedAt)
         switch snapshot.kind {
         case .interactive:
-            return "Updated \(timestamp) · full check"
+            return "Updated \(timestamp) · app counters + Wi-Fi"
         case .pathCheck:
             return "Checked \(timestamp) · reused app counters"
         case .rollingAppCounters:
@@ -94,15 +94,15 @@ extension PopoverView {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
     func confidenceText(_ snapshot: NetworkSnapshot) -> String {
-        if applicableCorrelation(for: snapshot) != nil && model.effectiveConfidence != snapshot.diagnosis.confidence {
-            return "\(model.effectiveConfidence.rawValue.capitalized) confidence"
+        if applicableCorrelation(for: snapshot) != nil && model.state.effectiveConfidence != snapshot.diagnosis.confidence {
+            return "\(model.state.effectiveConfidence.rawValue.capitalized) confidence"
         }
 
         return "\(snapshot.diagnosis.confidence.rawValue.capitalized) confidence"
     }
 
     func applicableCorrelation(for snapshot: NetworkSnapshot) -> RecentCorrelation? {
-        guard let correlation = model.correlation,
+        guard let correlation = model.state.correlation,
               snapshot.diagnosis.kind.canUseAppCorrelation,
               snapshot.diagnosis.kind.appName == correlation.appName else {
             return nil
@@ -114,7 +114,7 @@ extension PopoverView {
     func sampleKindText(_ kind: SnapshotKind) -> String {
         switch kind {
         case .interactive:
-            return "Full check"
+            return "App + Wi-Fi"
         case .pathCheck:
             return "Path checked"
         case .rollingAppCounters:
@@ -122,7 +122,7 @@ extension PopoverView {
         }
     }
     func statusColor(theme: NetScopePopoverTheme) -> Color {
-        switch model.status {
+        switch model.state.status {
         case .normal:
             return theme.success
         case .possiblePressure:

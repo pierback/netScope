@@ -11,7 +11,6 @@ final class RollingObservationScheduler {
 
     private var timer: Timer?
     private var failureCount = 0
-    private var isForegroundObservationActive = false
 
     init(
         observationPolicy: PassiveObservationPolicy = PassiveObservationPolicy(),
@@ -32,21 +31,8 @@ final class RollingObservationScheduler {
         schedule(after: PowerBudget.initialObservationDelaySeconds)
     }
 
-    func pause() {
-        timer?.invalidate()
-        timer = nil
-    }
-
     func stop() {
-        pause()
-    }
-
-    func setForegroundObservationActive(_ isActive: Bool) {
-        isForegroundObservationActive = isActive
-    }
-
-    func scheduleNext() {
-        schedule()
+        cancelScheduledRun()
     }
 
     func runNow() {
@@ -63,31 +49,27 @@ final class RollingObservationScheduler {
         }
     }
 
-    private func schedule(after interval: TimeInterval? = nil) {
+    private func schedule(after interval: TimeInterval) {
         guard PowerBudget.allowsRollingAppCounterSampling else {
             return
         }
 
-        pause()
-        let nextInterval = interval ?? nextObservationInterval
-        let nextTimer = Timer.scheduledTimer(withTimeInterval: nextInterval, repeats: false) { [weak self] _ in
+        cancelScheduledRun()
+        let nextTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: false) { [weak self] _ in
             Task { @MainActor in
                 self?.runNow()
             }
         }
-        nextTimer.tolerance = observationPolicy.timerTolerance(for: nextInterval)
+        nextTimer.tolerance = observationPolicy.timerTolerance(for: interval)
         timer = nextTimer
     }
 
-    private var nextObservationInterval: TimeInterval {
-        observationInterval(for: failureCount)
+    private func cancelScheduledRun() {
+        timer?.invalidate()
+        timer = nil
     }
 
-    private func observationInterval(for failureCount: Int) -> TimeInterval {
-        if isForegroundObservationActive && !isPowerConstrained() && failureCount == 0 {
-            return PowerBudget.foregroundObservationSampleSeconds
-        }
-
+    private func intervalForCurrentState() -> TimeInterval {
         return observationPolicy.nextInterval(
             consecutiveFailures: failureCount,
             isPowerConstrained: isPowerConstrained()
@@ -98,13 +80,12 @@ final class RollingObservationScheduler {
         switch result {
         case .sampled:
             failureCount = 0
-            return nextObservationInterval
         case .skipped:
-            return nextObservationInterval
+            break
         case .failed:
             failureCount += 1
         }
 
-        return observationInterval(for: failureCount)
+        return intervalForCurrentState()
     }
 }

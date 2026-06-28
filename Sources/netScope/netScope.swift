@@ -5,7 +5,7 @@ import NetScopeCore
 struct NetScopeCLI {
     static func main() {
         do {
-            let snapshot = try SnapshotService().capture()
+            let snapshot = try SnapshotService().captureFullCheck()
             let diagnosis = snapshot.diagnosis
 
             print("NetScope")

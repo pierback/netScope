@@ -8,7 +8,6 @@ import Testing
     #expect(PowerBudget.pingPackets <= 2)
     #expect(PowerBudget.maximumCommandSeconds <= 10)
     #expect(PowerBudget.initialObservationDelaySeconds >= 5)
-    #expect(PowerBudget.foregroundObservationSampleSeconds >= 10)
     #expect(PowerBudget.rollingAppCounterSampleSeconds >= 60)
     #expect(PowerBudget.powerConstrainedRollingAppCounterSampleSeconds >= 5 * 60)
     #expect(PowerBudget.maximumRollingAppCounterBackoffSeconds >= PowerBudget.powerConstrainedRollingAppCounterSampleSeconds)

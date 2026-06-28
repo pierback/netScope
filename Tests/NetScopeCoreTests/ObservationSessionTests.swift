@@ -42,6 +42,29 @@ import Testing
     #expect(update.state.status == .likelyIssue)
 }
 
+@Test func interactiveObservationReusesBaselineWithoutRecordingRollingSample() {
+    let now = Date(timeIntervalSince1970: 3_500)
+    var baseline = TrafficBaseline(maximumAgeSeconds: 3_600, maximumApps: 10)
+    baseline.record(apps: [app("codex", down: 40_000, up: 40_000)], at: now.addingTimeInterval(-60))
+    var session = ObservationSession(baseline: baseline)
+
+    let update = session.applyInteractiveObservationSnapshot(
+        appSnapshot(
+            at: now,
+            appName: "codex",
+            confidence: .low,
+            kind: .interactive
+        )
+    )
+
+    #expect(!update.baselineChanged)
+    #expect(update.state.snapshot?.kind == .interactive)
+    #expect(update.state.lastRollingSampleAt == nil)
+    #expect(update.state.learnedBaselineAppCount == 1)
+    #expect(session.latestAppObservationForPathCheck?.kind == .interactive)
+    #expect(session.baselineForPersistence.learnedAppCount == 1)
+}
+
 @Test func pathCheckDoesNotOverwriteLatestAppObservationOrRecordBaseline() {
     let now = Date(timeIntervalSince1970: 4_000)
     var session = ObservationSession()

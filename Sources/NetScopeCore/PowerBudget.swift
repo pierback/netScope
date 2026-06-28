@@ -13,7 +13,6 @@ public enum PowerBudget {
     public static let processTerminationGraceSeconds: TimeInterval = 0.5
     public static let maximumCommandOutputBytes = 256 * 1024
     public static let initialObservationDelaySeconds: TimeInterval = 10
-    public static let foregroundObservationSampleSeconds: TimeInterval = 10
     public static let rollingAppCounterSampleSeconds: TimeInterval = 60
     public static let powerConstrainedRollingAppCounterSampleSeconds: TimeInterval = 5 * 60
     public static let maximumRollingAppCounterBackoffSeconds: TimeInterval = 10 * 60

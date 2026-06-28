@@ -25,7 +25,7 @@ struct PopoverView: View {
                 .padding(.top, 10)
                 .padding(.bottom, 11)
 
-            if let snapshot = model.snapshot {
+            if let snapshot = model.state.snapshot {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 12) {
                         diagnosis(snapshot, theme: theme)

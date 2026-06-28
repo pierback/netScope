@@ -9,7 +9,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private let popover = NSPopover()
     private let model = MenuBarModel()
     private var statusCancellable: AnyCancellable?
-    private var isPopoverOpen = false
     private var popoverGlobalDismissMonitor: Any?
     private lazy var rollingObservationScheduler = RollingObservationScheduler(
         isPowerConstrained: { [weak self] in
@@ -113,7 +112,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     }
 
     @objc private func checkNetworkPathFromMenu() {
-        model.refresh()
+        model.checkNetworkPath()
     }
 
     @objc private func clearBaselineFromMenu() {
@@ -129,12 +128,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             return
         }
 
-        isPopoverOpen = true
-        rollingObservationScheduler.setForegroundObservationActive(true)
-        rollingObservationScheduler.pause()
-        rollingObservationScheduler.runNow()
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         startPopoverDismissMonitoring()
+        model.observeCurrentActivity()
     }
 
     private func closePopover() {
@@ -150,18 +146,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     }
 
     func popoverDidClose(_ notification: Notification) {
-        markPopoverClosedAndResumeBackgroundObservation()
-    }
-
-    private func markPopoverClosedAndResumeBackgroundObservation() {
-        let shouldResume = isPopoverOpen || popoverGlobalDismissMonitor != nil
-        isPopoverOpen = false
         stopPopoverDismissMonitoring()
-
-        if shouldResume {
-            rollingObservationScheduler.setForegroundObservationActive(false)
-            rollingObservationScheduler.scheduleNext()
-        }
     }
 
     private func startPopoverDismissMonitoring() {

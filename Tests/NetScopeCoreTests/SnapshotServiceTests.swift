@@ -17,17 +17,33 @@ import Testing
     #expect(runner.executables == ["/usr/bin/nettop"])
 }
 
-@Test func interactiveSnapshotsRunPingProbe() throws {
+@Test func interactiveObservationsDoNotRunPingProbe() throws {
     let runner = RecordingCommandRunner()
     let service = SnapshotService(
         sampler: NettopSampler(runner: runner),
         pingProbe: PingProbe(runner: runner)
     )
 
-    let snapshot = try service.capture()
+    let snapshot = try service.captureInteractiveObservation()
+
+    #expect(snapshot.kind == .interactive)
+    #expect(snapshot.ping == nil)
+    #expect(snapshot.wifi != nil)
+    #expect(runner.executables == ["/usr/bin/nettop"])
+}
+
+@Test func fullChecksRunPingProbe() throws {
+    let runner = RecordingCommandRunner()
+    let service = SnapshotService(
+        sampler: NettopSampler(runner: runner),
+        pingProbe: PingProbe(runner: runner)
+    )
+
+    let snapshot = try service.captureFullCheck()
 
     #expect(snapshot.kind == .interactive)
     #expect(snapshot.ping?.host == "1.1.1.1")
+    #expect(snapshot.wifi != nil)
     #expect(runner.executables == ["/usr/bin/nettop", "/sbin/ping"])
 }
 

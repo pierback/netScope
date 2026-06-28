@@ -8,6 +8,12 @@ enum RollingSampleResult: Sendable {
     case failed
 }
 
+private enum ActiveOperation {
+    case interactiveObservation
+    case rollingSample
+    case pathCheck
+}
+
 @MainActor
 final class MenuBarModel: ObservableObject {
     @Published private(set) var state: ObservationState
@@ -18,7 +24,8 @@ final class MenuBarModel: ObservableObject {
     private let snapshotService: SnapshotService
     private let baselinePersistence: BaselinePersistenceController?
     private var observationSession: ObservationSession
-    private var isRollingSampleInFlight = false
+    private var activeOperation: ActiveOperation?
+    private var hasQueuedPathCheck = false
 
     init(
         snapshotService: SnapshotService = SnapshotService(),
@@ -49,78 +56,57 @@ final class MenuBarModel: ObservableObject {
         self.state = observationSession.state
     }
 
-    var snapshot: NetworkSnapshot? {
-        state.snapshot
-    }
-
-    var lastPathCheck: NetworkSnapshot? {
-        state.lastPathCheck
-    }
-
-    var correlation: RecentCorrelation? {
-        state.correlation
-    }
-
-    var status: NetworkStatus {
-        state.status
-    }
-
-    var effectiveConfidence: Confidence {
-        state.effectiveConfidence
-    }
-
-    var learnedBaselineAppCount: Int {
-        state.learnedBaselineAppCount
-    }
-
-    var baselineAssessment: TrafficBaselineAssessment? {
-        state.baselineAssessment
-    }
-
-    var trafficTrend: [TrafficTrendPoint] {
-        state.trafficTrend
-    }
-
-    var lastRollingSampleAt: Date? {
-        state.lastRollingSampleAt
-    }
-
-    func refresh() {
-        guard !isLoading else {
+    func observeCurrentActivity() {
+        guard activeOperation == nil else {
             return
         }
 
-        isLoading = true
-        rollingWarning = nil
+        activeOperation = .interactiveObservation
         let service = snapshotService
 
         Task {
             defer {
-                isLoading = false
+                finishAppObservation()
             }
 
-            let currentAppObservation = observationSession.latestAppObservationForPathCheck
-            let nextSnapshot = await Task.detached(priority: .utility) {
-                service.checkNetworkPath(currentAppSnapshot: currentAppObservation)
-            }.value
+            do {
+                let snapshot = try await Task.detached(priority: .utility) {
+                    try service.captureInteractiveObservation()
+                }.value
 
-            let update = observationSession.applyPathCheckSnapshot(nextSnapshot)
-            apply(update.state)
+                let update = observationSession.applyInteractiveObservationSnapshot(snapshot)
+                apply(update.state)
+                rollingWarning = nil
+            } catch {
+                rollingWarning = "App counters unavailable. Keeping the last observed counters."
+            }
+        }
+    }
+
+    func checkNetworkPath() {
+        switch activeOperation {
+        case .pathCheck:
+            return
+        case .interactiveObservation, .rollingSample:
+            hasQueuedPathCheck = true
+            return
+        case nil:
+            startPathCheck()
         }
     }
 
     func recordRollingAppCounterSample(completion: (@MainActor @Sendable (RollingSampleResult) -> Void)? = nil) {
-        guard !isLoading, !isRollingSampleInFlight else {
+        guard activeOperation == nil else {
             completion?(.skipped)
             return
         }
 
-        isRollingSampleInFlight = true
+        activeOperation = .rollingSample
         let service = snapshotService
 
         Task {
             defer {
-                isRollingSampleInFlight = false
+                finishAppObservation()
             }
 
             do {
@@ -155,6 +141,50 @@ final class MenuBarModel: ObservableObject {
 
     private func apply(_ state: ObservationState) {
         self.state = state
+    }
+
+    private func startPathCheck() {
+        guard activeOperation == nil else {
+            return
+        }
+
+        activeOperation = .pathCheck
+        isLoading = true
+        rollingWarning = nil
+        let service = snapshotService
+
+        Task {
+            defer {
+                finishPathCheck()
+            }
+
+            let currentAppObservation = observationSession.latestAppObservationForPathCheck
+            let nextSnapshot = await Task.detached(priority: .utility) {
+                service.checkNetworkPath(currentAppSnapshot: currentAppObservation)
+            }.value
+
+            let update = observationSession.applyPathCheckSnapshot(nextSnapshot)
+            apply(update.state)
+        }
+    }
+
+    private func finishAppObservation() {
+        activeOperation = nil
+        runQueuedPathCheckIfNeeded()
+    }
+
+    private func finishPathCheck() {
+        isLoading = false
+        activeOperation = nil
+    }
+
+    private func runQueuedPathCheckIfNeeded() {
+        guard hasQueuedPathCheck, activeOperation == nil else {
+            return
+        }
+
+        hasQueuedPathCheck = false
+        startPathCheck()
     }
 
     private func saveBaselineIfNeeded(_ update: ObservationUpdate) {

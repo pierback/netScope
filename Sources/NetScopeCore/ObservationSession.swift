@@ -28,11 +28,34 @@ public struct ObservationSession: Sendable {
     }
 
     @discardableResult
+    public mutating func applyInteractiveObservationSnapshot(_ snapshot: NetworkSnapshot) -> ObservationUpdate {
+        applyAppObservationSnapshot(
+            snapshot,
+            updatesBaseline: false,
+            recordsRollingTimestamp: false
+        )
+    }
+
+    @discardableResult
     public mutating func applyRollingAppCounterSnapshot(_ snapshot: NetworkSnapshot) -> ObservationUpdate {
+        applyAppObservationSnapshot(
+            snapshot,
+            updatesBaseline: true,
+            recordsRollingTimestamp: true
+        )
+    }
+
+    private mutating func applyAppObservationSnapshot(
+        _ snapshot: NetworkSnapshot,
+        updatesBaseline: Bool,
+        recordsRollingTimestamp: Bool
+    ) -> ObservationUpdate {
         history.record(snapshot)
         let nextCorrelation = history.correlation()
         let nextBaselineAssessment = baseline.assess(apps: snapshot.apps, at: snapshot.capturedAt)
-        let baselineChanged = baseline.record(apps: snapshot.apps, at: snapshot.capturedAt)
+        let baselineChanged = updatesBaseline
+            ? baseline.record(apps: snapshot.apps, at: snapshot.capturedAt)
+            : false
 
         latestAppObservation = snapshot
         state.snapshot = snapshot
@@ -40,7 +63,9 @@ public struct ObservationSession: Sendable {
         state.baselineAssessment = nextBaselineAssessment
         state.learnedBaselineAppCount = baseline.learnedAppCount
         state.trafficTrend = history.trafficTrend()
-        state.lastRollingSampleAt = snapshot.capturedAt
+        if recordsRollingTimestamp {
+            state.lastRollingSampleAt = snapshot.capturedAt
+        }
         updateStatus(correlation: nextCorrelation, now: snapshot.capturedAt)
 
         return ObservationUpdate(state: state, baselineChanged: baselineChanged)

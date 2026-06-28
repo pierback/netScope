@@ -70,7 +70,7 @@ extension PopoverView {
     }
 
     func pathStatus(_ snapshot: NetworkSnapshot, theme: NetScopePopoverTheme) -> some View {
-        let check = model.lastPathCheck?.pathCheck ?? snapshot.pathCheck
+        let check = model.state.lastPathCheck?.pathCheck ?? snapshot.pathCheck
 
         return VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline) {
@@ -162,20 +162,20 @@ extension PopoverView {
 
                 Spacer()
 
-                Text("\(model.trafficTrend.count) samples")
+                Text("\(model.state.trafficTrend.count) samples")
                     .font(NetScopeFont.medium(10.5))
                     .monospacedDigit()
                     .foregroundStyle(theme.tertiaryText)
             }
 
-            TrafficSparkline(points: model.trafficTrend, theme: theme)
+            TrafficSparkline(points: model.state.trafficTrend, theme: theme)
                 .frame(height: 34)
         }
         .padding(.vertical, 2)
     }
 
     func baseline(_ snapshot: NetworkSnapshot, theme: NetScopePopoverTheme) -> some View {
-        let assessment = model.baselineAssessment
+        let assessment = model.state.baselineAssessment
         let message = model.baselineWarning ?? assessment?.summary ?? "Learning local baseline."
 
         return VStack(alignment: .leading, spacing: 8) {
@@ -186,7 +186,7 @@ extension PopoverView {
 
                 Spacer()
 
-                Text("\(model.learnedBaselineAppCount) apps")
+                Text("\(model.state.learnedBaselineAppCount) apps")
                     .font(NetScopeFont.medium(10.5))
                     .monospacedDigit()
                     .foregroundStyle(theme.tertiaryText)
@@ -334,6 +334,6 @@ extension PopoverView {
     }
 
     func latestPing(_ snapshot: NetworkSnapshot) -> PingResult? {
-        model.lastPathCheck?.ping ?? snapshot.ping
+        model.state.lastPathCheck?.ping ?? snapshot.ping
     }
 }

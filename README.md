@@ -65,7 +65,7 @@ swift run netScope
 
 Run it while the connection feels slow. The output includes the current diagnosis, confidence level, evidence, and top network apps.
 
-The command exits after one interactive snapshot.
+The command exits after one on-demand full-check snapshot.
 
 ## Menu Bar App
 
