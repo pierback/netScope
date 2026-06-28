@@ -157,7 +157,7 @@ private final class RecordingCommandRunner: CommandRunning, @unchecked Sendable 
         }
     }
 
-    func run(_ executable: String, arguments: [String]) throws -> CommandResult {
+    func run(_ executable: String, arguments: [String], timeoutSeconds: TimeInterval) throws -> CommandResult {
         lock.withLock {
             recordedExecutables.append(executable)
         }

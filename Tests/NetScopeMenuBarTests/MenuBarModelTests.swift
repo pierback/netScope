@@ -131,7 +131,7 @@ private func waitUntil(
 }
 
 private struct SuccessfulNettopRunner: CommandRunning, Sendable {
-    func run(_ executable: String, arguments: [String]) throws -> CommandResult {
+    func run(_ executable: String, arguments: [String], timeoutSeconds: TimeInterval) throws -> CommandResult {
         CommandResult(exitCode: 0, stdout: """
         ,bytes_in,bytes_out,re-tx,
         codex.42,40000,12000,0,
@@ -141,7 +141,7 @@ private struct SuccessfulNettopRunner: CommandRunning, Sendable {
 }
 
 private struct FailingNettopRunner: CommandRunning, Sendable {
-    func run(_ executable: String, arguments: [String]) throws -> CommandResult {
+    func run(_ executable: String, arguments: [String], timeoutSeconds: TimeInterval) throws -> CommandResult {
         throw CommandRunnerError.timedOut(executable: executable, timeoutSeconds: 10)
     }
 }
@@ -166,7 +166,7 @@ private final class DelayedCommandRunner: CommandRunning, @unchecked Sendable {
         }
     }
 
-    func run(_ executable: String, arguments: [String]) throws -> CommandResult {
+    func run(_ executable: String, arguments: [String], timeoutSeconds: TimeInterval) throws -> CommandResult {
         lock.withLock {
             recordedExecutables.append(executable)
         }

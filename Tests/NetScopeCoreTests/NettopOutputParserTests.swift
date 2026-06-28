@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import NetScopeCore
 
@@ -84,7 +85,7 @@ import Testing
 private struct StaticNettopRunner: CommandRunning {
     let result: CommandResult
 
-    func run(_ executable: String, arguments: [String]) throws -> CommandResult {
+    func run(_ executable: String, arguments: [String], timeoutSeconds: TimeInterval) throws -> CommandResult {
         result
     }
 }

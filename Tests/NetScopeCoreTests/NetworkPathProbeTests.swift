@@ -183,7 +183,7 @@ private final class PathCommandRunner: CommandRunning, @unchecked Sendable {
         }
     }
 
-    func run(_ executable: String, arguments: [String]) throws -> CommandResult {
+    func run(_ executable: String, arguments: [String], timeoutSeconds: TimeInterval) throws -> CommandResult {
         lock.withLock {
             recordedExecutables.append(executable)
         }
