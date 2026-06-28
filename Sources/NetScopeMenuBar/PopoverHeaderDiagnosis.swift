@@ -21,9 +21,9 @@ extension PopoverView {
                 } else {
                     HeaderIconButton(
                         systemSymbolName: "arrow.clockwise",
-                        tooltip: "Check network path",
+                        tooltip: "Refresh diagnosis",
                         onPress: {
-                            model.checkNetworkPath()
+                            model.refreshCurrentDiagnosis()
                         }
                     )
                 }
@@ -33,7 +33,7 @@ extension PopoverView {
             .overlay {
                 Circle().stroke(theme.controlBorder, lineWidth: 1)
             }
-            .help("Check network path")
+            .help("Refresh diagnosis")
         }
     }
 

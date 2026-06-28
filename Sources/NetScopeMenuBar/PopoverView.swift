@@ -47,9 +47,8 @@ struct PopoverView: View {
                         topApps(snapshot, theme: theme)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    // The AppKit probe must stay inside the ScrollView content to resolve the enclosing NSScrollView.
-                    .hiddenAppKitScrollIndicators()
                 }
+                .scrollIndicators(.hidden)
             } else {
                 VStack(alignment: .leading, spacing: 12) {
                     emptyState(theme: theme)

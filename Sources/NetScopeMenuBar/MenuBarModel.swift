@@ -83,6 +83,16 @@ final class MenuBarModel: ObservableObject {
         }
     }
 
+    func refreshCurrentDiagnosis() {
+        guard activeOperation == nil else {
+            checkNetworkPath()
+            return
+        }
+
+        hasQueuedPathCheck = true
+        observeCurrentActivity()
+    }
+
     func checkNetworkPath() {
         switch activeOperation {
         case .pathCheck:
@@ -150,7 +160,6 @@ final class MenuBarModel: ObservableObject {
 
         activeOperation = .pathCheck
         isLoading = true
-        rollingWarning = nil
         let service = snapshotService
 
         Task {

@@ -87,7 +87,10 @@ import NetScopeCore
 
 @MainActor
 @Test func pathCheckQueuesBehindInFlightRollingSample() async {
-    let runner = DelayedCommandRunner()
+    let runner = PathCheckCommandRunner(
+        nettopResults: [.success()],
+        nettopDelaySeconds: 0.05
+    )
     let service = SnapshotService(
         sampler: NettopSampler(runner: runner),
         pingProbe: PingProbe(runner: runner),
@@ -120,6 +123,217 @@ import NetScopeCore
 }
 
 @MainActor
+@Test func refreshCurrentDiagnosisCapturesFreshAppsBeforePathCheck() async {
+    let runner = PathCheckCommandRunner(
+        nettopResults: [.success()],
+        nettopDelaySeconds: 0.05
+    )
+    let service = SnapshotService(
+        sampler: NettopSampler(runner: runner),
+        pingProbe: PingProbe(runner: runner),
+        pathProbe: NetworkPathProbe(runner: runner)
+    )
+    let model = MenuBarModel(snapshotService: service, baselineStore: EmptyBaselineStore())
+
+    model.refreshCurrentDiagnosis()
+
+    await waitUntil(timeoutNanoseconds: 1_000_000_000) {
+        model.state.lastPathCheck != nil
+    }
+
+    #expect(model.state.snapshot?.kind == .pathCheck)
+    #expect(model.state.lastPathCheck?.apps.isEmpty == false)
+
+    switch model.state.lastPathCheck?.appEvidenceSource {
+    case .reusedFromSnapshot:
+        break
+    default:
+        Issue.record("Expected refresh to reuse the fresh app observation for the path check.")
+    }
+
+    #expect(runner.executables == ["/usr/bin/nettop", "/sbin/route", "/sbin/ping", "/sbin/ping", "/usr/bin/dig"])
+}
+
+@MainActor
+@Test func refreshCurrentDiagnosisStillRunsPathCheckWhenAppSamplingFails() async {
+    let runner = PathCheckCommandRunner(nettopResults: [.timedOut])
+    let service = SnapshotService(
+        sampler: NettopSampler(runner: runner),
+        pingProbe: PingProbe(runner: runner),
+        pathProbe: NetworkPathProbe(runner: runner)
+    )
+    let model = MenuBarModel(snapshotService: service, baselineStore: EmptyBaselineStore())
+
+    model.refreshCurrentDiagnosis()
+
+    await waitUntil(timeoutNanoseconds: 1_000_000_000) {
+        model.state.lastPathCheck != nil
+    }
+
+    #expect(model.rollingWarning == "App counters unavailable. Keeping the last observed counters.")
+    #expect(model.state.snapshot?.kind == .pathCheck)
+
+    switch model.state.lastPathCheck?.appEvidenceSource {
+    case .unavailable:
+        break
+    default:
+        Issue.record("Expected refresh path check to continue without app evidence after nettop failure.")
+    }
+
+    #expect(runner.executables == ["/usr/bin/nettop", "/sbin/route", "/sbin/ping", "/sbin/ping", "/usr/bin/dig"])
+}
+
+@MainActor
+@Test func refreshCurrentDiagnosisWaitsForFreshObservationInsteadOfReusingOlderSnapshot() async {
+    let runner = PathCheckCommandRunner(
+        nettopResults: [
+            .success(stdout: """
+            ,bytes_in,bytes_out,re-tx,
+            oldapp.42,20000,8000,0,
+            """),
+            .success(stdout: """
+            ,bytes_in,bytes_out,re-tx,
+            newapp.43,64000,16000,0,
+            """)
+        ],
+        nettopDelaySeconds: 0.05
+    )
+    let service = SnapshotService(
+        sampler: NettopSampler(runner: runner),
+        pingProbe: PingProbe(runner: runner),
+        pathProbe: NetworkPathProbe(runner: runner)
+    )
+    let model = MenuBarModel(snapshotService: service, baselineStore: EmptyBaselineStore())
+
+    model.observeCurrentActivity()
+
+    await waitUntil(timeoutNanoseconds: 1_000_000_000) {
+        model.state.snapshot?.kind == .interactive
+    }
+
+    let previousObservationID = model.state.snapshot?.appObservationID
+    #expect(model.state.snapshot?.apps.map(\.displayName) == ["oldapp"])
+
+    model.refreshCurrentDiagnosis()
+
+    await waitUntil(timeoutNanoseconds: 1_000_000_000) {
+        guard let lastPathCheck = model.state.lastPathCheck else {
+            return false
+        }
+
+        return lastPathCheck.appObservationID != previousObservationID
+    }
+
+    #expect(model.state.lastPathCheck?.apps.map(\.displayName) == ["newapp"])
+    #expect(model.state.lastPathCheck?.appObservationID != previousObservationID)
+    #expect(runner.executables == ["/usr/bin/nettop", "/usr/bin/nettop", "/sbin/route", "/sbin/ping", "/sbin/ping", "/usr/bin/dig"])
+}
+
+@MainActor
+@Test func successfulRefreshClearsPreviousAppCounterWarning() async {
+    let runner = PathCheckCommandRunner(
+        nettopResults: [
+            .timedOut,
+            .success()
+        ]
+    )
+    let service = SnapshotService(
+        sampler: NettopSampler(runner: runner),
+        pingProbe: PingProbe(runner: runner),
+        pathProbe: NetworkPathProbe(runner: runner)
+    )
+    let model = MenuBarModel(snapshotService: service, baselineStore: EmptyBaselineStore())
+
+    model.observeCurrentActivity()
+
+    await waitUntil(timeoutNanoseconds: 1_000_000_000) {
+        model.rollingWarning != nil
+    }
+
+    model.refreshCurrentDiagnosis()
+
+    await waitUntil(timeoutNanoseconds: 1_000_000_000) {
+        model.state.lastPathCheck != nil
+    }
+
+    #expect(model.rollingWarning == nil)
+    #expect(model.state.lastPathCheck?.apps.isEmpty == false)
+    #expect(runner.executables == ["/usr/bin/nettop", "/usr/bin/nettop", "/sbin/route", "/sbin/ping", "/sbin/ping", "/usr/bin/dig"])
+}
+
+@MainActor
+@Test func refreshCurrentDiagnosisWhileObservationIsInFlightClearsPreviousWarning() async {
+    let runner = PathCheckCommandRunner(
+        nettopResults: [
+            .timedOut,
+            .success()
+        ],
+        nettopDelaySeconds: 0.05
+    )
+    let service = SnapshotService(
+        sampler: NettopSampler(runner: runner),
+        pingProbe: PingProbe(runner: runner),
+        pathProbe: NetworkPathProbe(runner: runner)
+    )
+    let model = MenuBarModel(snapshotService: service, baselineStore: EmptyBaselineStore())
+
+    model.observeCurrentActivity()
+
+    await waitUntil(timeoutNanoseconds: 1_000_000_000) {
+        model.rollingWarning != nil
+    }
+
+    model.observeCurrentActivity()
+    model.refreshCurrentDiagnosis()
+
+    await waitUntil(timeoutNanoseconds: 1_000_000_000) {
+        model.state.lastPathCheck != nil
+    }
+
+    #expect(model.rollingWarning == nil)
+    #expect(model.state.lastPathCheck?.apps.isEmpty == false)
+    #expect(runner.executables == ["/usr/bin/nettop", "/usr/bin/nettop", "/sbin/route", "/sbin/ping", "/sbin/ping", "/usr/bin/dig"])
+}
+
+@MainActor
+@Test func refreshCurrentDiagnosisDoesNotPersistBaselineTwice() async {
+    let store = RecordingBaselineStore()
+    let runner = PathCheckCommandRunner(
+        nettopResults: [
+            .success(),
+            .success()
+        ]
+    )
+    let service = SnapshotService(
+        sampler: NettopSampler(runner: runner),
+        pingProbe: PingProbe(runner: runner),
+        pathProbe: NetworkPathProbe(runner: runner)
+    )
+    let model = MenuBarModel(snapshotService: service, baselineStore: store)
+
+    var rollingResult: RollingSampleResult?
+    model.recordRollingAppCounterSample { outcome in
+        rollingResult = outcome
+    }
+
+    await waitUntil(timeoutNanoseconds: 1_000_000_000) {
+        rollingResult != nil && store.saveCallCount == 1
+    }
+
+    model.refreshCurrentDiagnosis()
+
+    await waitUntil(timeoutNanoseconds: 1_000_000_000) {
+        model.state.lastPathCheck != nil
+    }
+
+    try? await Task.sleep(for: .milliseconds(100))
+
+    #expect(rollingResult == .sampled)
+    #expect(store.saveCallCount == 1)
+    #expect(runner.executables == ["/usr/bin/nettop", "/usr/bin/nettop", "/sbin/route", "/sbin/ping", "/sbin/ping", "/usr/bin/dig"])
+}
+
+@MainActor
 private func waitUntil(
     timeoutNanoseconds: UInt64 = 200_000_000,
     condition: @MainActor @Sendable () -> Bool
@@ -146,19 +360,30 @@ private struct FailingNettopRunner: CommandRunning, Sendable {
     }
 }
 
-private struct EmptyBaselineStore: TrafficBaselineStoring, Sendable {
-    func load() throws -> TrafficBaseline {
-        TrafficBaseline()
-    }
-
-    func save(_ baseline: TrafficBaseline) throws {}
-
-    func clear() throws {}
+private enum NettopResult: Sendable {
+    case success(stdout: String = PathCheckCommandRunner.defaultNettopStdout)
+    case timedOut
 }
 
-private final class DelayedCommandRunner: CommandRunning, @unchecked Sendable {
+private final class PathCheckCommandRunner: CommandRunning, @unchecked Sendable {
+    static let defaultNettopStdout = """
+    ,bytes_in,bytes_out,re-tx,
+    codex.42,40000,12000,0,
+    Safari.43,12000,4000,0,
+    """
+
     private let lock = NSLock()
+    private var pendingNettopResults: [NettopResult]
     private var recordedExecutables: [String] = []
+    private let nettopDelaySeconds: TimeInterval
+
+    init(
+        nettopResults: [NettopResult],
+        nettopDelaySeconds: TimeInterval = 0
+    ) {
+        self.pendingNettopResults = nettopResults
+        self.nettopDelaySeconds = nettopDelaySeconds
+    }
 
     var executables: [String] {
         lock.withLock {
@@ -172,12 +397,24 @@ private final class DelayedCommandRunner: CommandRunning, @unchecked Sendable {
         }
 
         if executable == "/usr/bin/nettop" {
-            Thread.sleep(forTimeInterval: 0.05)
-            return CommandResult(exitCode: 0, stdout: """
-            ,bytes_in,bytes_out,re-tx,
-            codex.42,40000,12000,0,
-            Safari.43,12000,4000,0,
-            """, stderr: "")
+            if nettopDelaySeconds > 0 {
+                Thread.sleep(forTimeInterval: nettopDelaySeconds)
+            }
+
+            let nextResult = lock.withLock {
+                if pendingNettopResults.isEmpty {
+                    return NettopResult.success()
+                }
+
+                return pendingNettopResults.removeFirst()
+            }
+
+            switch nextResult {
+            case let .success(stdout):
+                return CommandResult(exitCode: 0, stdout: stdout, stderr: "")
+            case .timedOut:
+                throw CommandRunnerError.timedOut(executable: executable, timeoutSeconds: timeoutSeconds)
+            }
         }
 
         if executable == "/sbin/ping" {
@@ -206,6 +443,16 @@ private final class DelayedCommandRunner: CommandRunning, @unchecked Sendable {
 
         return CommandResult(exitCode: 127, stdout: "", stderr: "unexpected executable")
     }
+}
+
+private struct EmptyBaselineStore: TrafficBaselineStoring, Sendable {
+    func load() throws -> TrafficBaseline {
+        TrafficBaseline()
+    }
+
+    func save(_ baseline: TrafficBaseline) throws {}
+
+    func clear() throws {}
 }
 
 private final class RecordingBaselineStore: TrafficBaselineStoring, @unchecked Sendable {

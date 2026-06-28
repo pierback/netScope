@@ -73,7 +73,7 @@ The command exits after one on-demand full-check snapshot.
 swift run NetScopeMenuBar
 ```
 
-The menu bar app uses the same `NetScopeCore` diagnosis path. Opening the popover starts lightweight observation. Clicking refresh runs a bounded path check: default gateway ping, public ping, and one DNS lookup. While the app is running, NetScope records rolling app-counter samples at the conservative interval in `PowerBudget.rollingAppCounterSampleSeconds`. Those rolling samples do not ping, run a speed test, inspect packets, or write raw logs.
+The menu bar app uses the same `NetScopeCore` diagnosis path. Opening the popover starts lightweight observation. Clicking refresh first captures a fresh app-counter + Wi-Fi observation, then runs a bounded path check: default gateway ping, public ping, and one DNS lookup. While the app is running, NetScope records rolling app-counter samples at the conservative interval in `PowerBudget.rollingAppCounterSampleSeconds`. Those rolling samples do not ping, run a speed test, inspect packets, or write raw logs.
 
 Rolling app-counter samples also update the bounded local baseline. Path checks compare the current counters to that learned baseline but do not add duplicate app-counter samples.
 

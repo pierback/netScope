@@ -94,7 +94,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         closePopover()
 
         let menu = NSMenu()
-        let refreshItem = NSMenuItem(title: "Check Network Path", action: #selector(checkNetworkPathFromMenu), keyEquivalent: "r")
+        let refreshItem = NSMenuItem(title: "Refresh Diagnosis", action: #selector(refreshDiagnosisFromMenu), keyEquivalent: "r")
         refreshItem.target = self
         menu.addItem(refreshItem)
 
@@ -111,8 +111,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         statusItem.menu = nil
     }
 
-    @objc private func checkNetworkPathFromMenu() {
-        model.checkNetworkPath()
+    @objc private func refreshDiagnosisFromMenu() {
+        model.refreshCurrentDiagnosis()
     }
 
     @objc private func clearBaselineFromMenu() {
