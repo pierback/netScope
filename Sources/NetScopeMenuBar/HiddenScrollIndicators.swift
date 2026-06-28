@@ -24,14 +24,12 @@ private final class HiddenScrollIndicatorProbeView: NSView {
     private weak var configuredScrollView: NSScrollView?
     private var fallbackCheckCount = 0
     private var isFallbackCheckQueued = false
+    private var lifecycleGeneration = 0
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
 
-        if window == nil {
-            resetConfigurationState()
-        }
-
+        resetConfigurationState()
         configureScrollIndicatorsIfReady()
     }
 
@@ -60,6 +58,7 @@ private final class HiddenScrollIndicatorProbeView: NSView {
     }
 
     private func resetConfigurationState() {
+        lifecycleGeneration += 1
         configuredScrollView = nil
         fallbackCheckCount = 0
         isFallbackCheckQueued = false
@@ -72,8 +71,13 @@ private final class HiddenScrollIndicatorProbeView: NSView {
         }
 
         isFallbackCheckQueued = true
+        let scheduledGeneration = lifecycleGeneration
         DispatchQueue.main.async { [weak self] in
             guard let self else {
+                return
+            }
+
+            guard self.lifecycleGeneration == scheduledGeneration else {
                 return
             }
 
