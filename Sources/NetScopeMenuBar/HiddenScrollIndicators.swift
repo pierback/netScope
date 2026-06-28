@@ -36,6 +36,7 @@ private final class HiddenScrollIndicatorProbeView: NSView {
     override func viewDidMoveToSuperview() {
         super.viewDidMoveToSuperview()
 
+        resetConfigurationState()
         configureScrollIndicatorsIfReady()
     }
 
