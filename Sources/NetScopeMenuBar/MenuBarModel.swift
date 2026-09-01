@@ -74,8 +74,8 @@ final class MenuBarModel: ObservableObject {
                     try service.captureInteractiveObservation()
                 }.value
 
-                let update = observationSession.applyInteractiveObservationSnapshot(snapshot)
-                apply(update.state)
+                observationSession.applyInteractiveObservationSnapshot(snapshot)
+                state = observationSession.state
                 rollingWarning = nil
             } catch {
                 rollingWarning = "App counters unavailable. Keeping the last observed counters."
@@ -124,9 +124,9 @@ final class MenuBarModel: ObservableObject {
                     try service.captureRollingAppCounters()
                 }.value
 
-                let update = observationSession.applyRollingAppCounterSnapshot(rollingSnapshot)
-                apply(update.state)
-                saveBaselineIfNeeded(update)
+                let baselineChanged = observationSession.applyRollingAppCounterSnapshot(rollingSnapshot)
+                state = observationSession.state
+                saveBaselineIfNeeded(baselineChanged)
                 rollingWarning = nil
                 completion?(.sampled)
             } catch {
@@ -137,8 +137,8 @@ final class MenuBarModel: ObservableObject {
     }
 
     func clearBaseline() {
-        let update = observationSession.clearBaseline()
-        apply(update.state)
+        observationSession.clearBaseline()
+        state = observationSession.state
         baselineWarning = nil
         guard let baselinePersistence else {
             return
@@ -147,10 +147,6 @@ final class MenuBarModel: ObservableObject {
         baselinePersistence.clear { [weak self] warning in
             self?.baselineWarning = warning
         }
-    }
-
-    private func apply(_ state: ObservationState) {
-        self.state = state
     }
 
     private func startPathCheck() {
@@ -172,8 +168,8 @@ final class MenuBarModel: ObservableObject {
                 service.checkNetworkPath(currentAppSnapshot: currentAppObservation)
             }.value
 
-            let update = observationSession.applyPathCheckSnapshot(nextSnapshot)
-            apply(update.state)
+            observationSession.applyPathCheckSnapshot(nextSnapshot)
+            state = observationSession.state
         }
     }
 
@@ -196,8 +192,8 @@ final class MenuBarModel: ObservableObject {
         startPathCheck()
     }
 
-    private func saveBaselineIfNeeded(_ update: ObservationUpdate) {
-        guard update.baselineChanged,
+    private func saveBaselineIfNeeded(_ baselineChanged: Bool) {
+        guard baselineChanged,
               let baselinePersistence else {
             return
         }

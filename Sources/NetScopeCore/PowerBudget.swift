@@ -1,8 +1,6 @@
 import Foundation
 
 public enum PowerBudget {
-    public static let allowsRollingAppCounterSampling = true
-    public static let allowsBackgroundActiveProbes = false
     public static let nettopSamples = 2
     public static let pingPackets = 2
     public static let maximumCommandSeconds: TimeInterval = 10

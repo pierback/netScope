@@ -45,8 +45,23 @@ public struct NetworkPathProbe: Sendable {
             publicPing: publicPing,
             dnsLookup: dnsLookup,
             scope: scope,
-            summary: summary(for: scope, gatewayAddress: gateway, gatewayPing: gatewayPing, publicPing: publicPing, dnsLookup: dnsLookup)
+            summary: summary(for: scope, gatewayAddress: gateway, gatewayPing: gatewayPing)
         )
+    }
+
+    public static func parseGateway(from output: String) -> String? {
+        for line in output.split(whereSeparator: \.isNewline).map(String.init) {
+            let parts = line.split(separator: ":", maxSplits: 1).map {
+                $0.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+            guard parts.count == 2, parts[0] == "gateway", !parts[1].isEmpty else {
+                continue
+            }
+
+            return parts[1]
+        }
+
+        return nil
     }
 
     private func defaultGateway(deadline: Date) -> String? {
@@ -90,10 +105,10 @@ public struct NetworkPathProbe: Sendable {
         publicPing: PingResult?,
         dnsLookup: DNSLookupResult?
     ) -> NetworkPathScope {
-        let gatewayIsBad = gatewayPing.map(pingLooksBad) == true
-        let gatewayIsGood = gatewayPing.map { !pingLooksBad($0) } == true
-        let publicIsBad = publicPing.map(pingLooksBad) == true
-        let publicIsGood = publicPing.map { !pingLooksBad($0) } == true
+        let gatewayIsBad = gatewayPing?.indicatesPathProblem == true
+        let gatewayIsGood = gatewayPing.map { !$0.indicatesPathProblem } == true
+        let publicIsBad = publicPing?.indicatesPathProblem == true
+        let publicIsGood = publicPing.map { !$0.indicatesPathProblem } == true
         let dnsIsBad = dnsLookup.map(dnsLooksBad) == true
 
         if gatewayAddress != nil && gatewayIsBad {
@@ -118,9 +133,7 @@ public struct NetworkPathProbe: Sendable {
     private func summary(
         for scope: NetworkPathScope,
         gatewayAddress: String?,
-        gatewayPing: PingResult?,
-        publicPing: PingResult?,
-        dnsLookup: DNSLookupResult?
+        gatewayPing: PingResult?
     ) -> String {
         switch scope {
         case .localNetwork:
@@ -138,18 +151,6 @@ public struct NetworkPathProbe: Sendable {
         case .unknown:
             return "Network path check could not isolate the fault."
         }
-    }
-
-    private func pingLooksBad(_ ping: PingResult) -> Bool {
-        if ping.packetLossPercent >= 5 {
-            return true
-        }
-
-        if let average = ping.averageMilliseconds, average >= 150 {
-            return true
-        }
-
-        return false
     }
 
     private func dnsLooksBad(_ result: DNSLookupResult?) -> Bool {
@@ -177,18 +178,4 @@ public struct NetworkPathProbe: Sendable {
         return min(cap, remaining)
     }
 
-    public static func parseGateway(from output: String) -> String? {
-        for line in output.split(whereSeparator: \.isNewline).map(String.init) {
-            let parts = line.split(separator: ":", maxSplits: 1).map {
-                $0.trimmingCharacters(in: .whitespacesAndNewlines)
-            }
-            guard parts.count == 2, parts[0] == "gateway", !parts[1].isEmpty else {
-                continue
-            }
-
-            return parts[1]
-        }
-
-        return nil
-    }
 }

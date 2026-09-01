@@ -3,33 +3,23 @@ import Foundation
 public struct StatusPolicy: Sendable {
     public init() {}
 
-    public func status(for diagnosis: Diagnosis, correlation: RecentCorrelation?) -> NetworkStatus {
-        switch effectiveConfidence(for: diagnosis, correlation: correlation) {
-        case .high:
-            return .likelyIssue
-        case .medium:
-            return .possiblePressure
-        case .low:
-            return .normal
-        }
-    }
-
-    public func status(
+    public func evaluate(
         latestAppObservation: NetworkSnapshot?,
         latestPathCheck: NetworkSnapshot?,
         correlation: RecentCorrelation?,
         now: Date = Date()
-    ) -> NetworkStatus {
+    ) -> (status: NetworkStatus, effectiveConfidence: Confidence) {
         guard let diagnosis = selectedDiagnosis(
             latestAppObservation: latestAppObservation,
             latestPathCheck: latestPathCheck,
             correlation: correlation,
             now: now
         ) else {
-            return .normal
+            return (.normal, .low)
         }
 
-        return status(for: diagnosis, correlation: correlation)
+        let confidence = effectiveConfidence(for: diagnosis, correlation: correlation)
+        return (status(for: confidence), confidence)
     }
 
     public func effectiveConfidence(for diagnosis: Diagnosis, correlation: RecentCorrelation?) -> Confidence {
@@ -45,24 +35,6 @@ public struct StatusPolicy: Sendable {
         case .medium, .low:
             return .high
         }
-    }
-
-    public func effectiveConfidence(
-        latestAppObservation: NetworkSnapshot?,
-        latestPathCheck: NetworkSnapshot?,
-        correlation: RecentCorrelation?,
-        now: Date = Date()
-    ) -> Confidence {
-        guard let diagnosis = selectedDiagnosis(
-            latestAppObservation: latestAppObservation,
-            latestPathCheck: latestPathCheck,
-            correlation: correlation,
-            now: now
-        ) else {
-            return .low
-        }
-
-        return effectiveConfidence(for: diagnosis, correlation: correlation)
     }
 
     private func selectedDiagnosis(
@@ -92,5 +64,16 @@ public struct StatusPolicy: Sendable {
         }
 
         return snapshot.diagnosis
+    }
+
+    private func status(for confidence: Confidence) -> NetworkStatus {
+        switch confidence {
+        case .high:
+            return .likelyIssue
+        case .medium:
+            return .possiblePressure
+        case .low:
+            return .normal
+        }
     }
 }

@@ -32,6 +32,14 @@ import Testing
     #expect(groups.userApps.map(\.app.displayName) == ["codex", "Slack", "Safari"])
 }
 
+@Test func distinguishesNetworkPathAppsFromOtherInfrastructure() {
+    let classifier = AppTrafficClassifier()
+
+    #expect(classifier.isNetworkPathApp("com.zscaler.zsc"))
+    #expect(!classifier.isNetworkPathApp("com.crowdstrike.falcon.Agent"))
+    #expect(classifier.role(for: "com.crowdstrike.falcon.Agent") == .infrastructure)
+}
+
 private func app(_ name: String, total: Int) -> AppTraffic {
     AppTraffic(
         displayName: name,

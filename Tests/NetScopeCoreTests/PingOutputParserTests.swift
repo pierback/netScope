@@ -36,6 +36,23 @@ import Testing
     #expect(result.averageMilliseconds == nil)
 }
 
+@Test func pathProblemThresholdsAreInclusiveAndHandleMissingLatency() {
+    #expect(ping(loss: 5, average: nil).indicatesPathProblem)
+    #expect(ping(loss: 0, average: 150).indicatesPathProblem)
+    #expect(!ping(loss: 4.999, average: 149.999).indicatesPathProblem)
+    #expect(!ping(loss: 0, average: nil).indicatesPathProblem)
+}
+
+private func ping(loss: Double, average: Double?) -> PingResult {
+    PingResult(
+        host: "1.1.1.1",
+        transmitted: 2,
+        received: loss == 100 ? 0 : 2,
+        packetLossPercent: loss,
+        averageMilliseconds: average
+    )
+}
+
 private struct StaticPingRunner: CommandRunning {
     let result: CommandResult
 

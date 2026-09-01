@@ -34,20 +34,13 @@ public struct SnapshotHistory: Equatable, Sendable {
     }
 
     public func correlation() -> RecentCorrelation? {
-        let pressureSnapshots = snapshots.filter {
-            $0.diagnosis.confidence != .low
-                && $0.diagnosis.kind.canUseAppCorrelation
-                && $0.appEvidenceSource.isFreshlySampled
-                && $0.appObservationID != nil
-        }
-        guard pressureSnapshots.count >= 2 else {
-            return nil
-        }
-
         var countsByApp: [String: Int] = [:]
         var seenObservationIDsByApp: [String: Set<UUID>] = [:]
-        for snapshot in pressureSnapshots {
-            guard let appName = snapshot.diagnosis.kind.appName,
+        for snapshot in snapshots {
+            guard snapshot.diagnosis.confidence != .low,
+                  snapshot.diagnosis.kind.canUseAppCorrelation,
+                  snapshot.appEvidenceSource.isFreshlySampled,
+                  let appName = snapshot.diagnosis.kind.appName,
                   let appObservationID = snapshot.appObservationID else {
                 continue
             }

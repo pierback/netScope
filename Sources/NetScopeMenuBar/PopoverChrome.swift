@@ -19,7 +19,12 @@ extension PopoverView {
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .glassPanel(theme: theme, cornerRadius: 18)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(theme.panelSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(theme.panelBorder, lineWidth: 1)
+        }
     }
 
     func warningNotice(_ message: String, theme: NetScopePopoverTheme) -> some View {

@@ -2,8 +2,6 @@ import Testing
 @testable import NetScopeCore
 
 @Test func defaultsProtectBatteryAndResponsiveness() {
-    #expect(PowerBudget.allowsRollingAppCounterSampling == true)
-    #expect(PowerBudget.allowsBackgroundActiveProbes == false)
     #expect(PowerBudget.nettopSamples == 2)
     #expect(PowerBudget.pingPackets <= 2)
     #expect(PowerBudget.maximumCommandSeconds <= 10)

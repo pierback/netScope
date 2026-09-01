@@ -49,7 +49,8 @@ public struct LocalTrafficBaselineStore: TrafficBaselineStoring {
         }
 
         let data = try loadBoundedData()
-        var baseline = try decoder.decode(TrafficBaseline.self, from: data)
+        let persisted = try decoder.decode(PersistedTrafficBaseline.self, from: data)
+        var baseline = TrafficBaseline(recordsByAppName: persisted.recordsByAppName)
         baseline.prune()
         return baseline
     }
@@ -61,7 +62,7 @@ public struct LocalTrafficBaselineStore: TrafficBaselineStoring {
             withIntermediateDirectories: true,
             attributes: [.posixPermissions: 0o700]
         )
-        let data = try encoder.encode(baseline)
+        let data = try encoder.encode(PersistedTrafficBaseline(recordsByAppName: baseline.recordsByAppName))
         try data.write(to: fileURL, options: [.atomic])
         try fileManager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: fileURL.path)
     }
@@ -98,4 +99,8 @@ public struct LocalTrafficBaselineStore: TrafficBaselineStoring {
 
         return data
     }
+}
+
+private struct PersistedTrafficBaseline: Codable {
+    let recordsByAppName: [String: TrafficBaselineRecord]
 }

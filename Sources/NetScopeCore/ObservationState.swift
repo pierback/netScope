@@ -33,13 +33,3 @@ public struct ObservationState: Equatable, Sendable {
         self.lastRollingSampleAt = lastRollingSampleAt
     }
 }
-
-public struct ObservationUpdate: Equatable, Sendable {
-    public let state: ObservationState
-    public let baselineChanged: Bool
-
-    public init(state: ObservationState, baselineChanged: Bool) {
-        self.state = state
-        self.baselineChanged = baselineChanged
-    }
-}

@@ -6,7 +6,7 @@ extension PopoverView {
         HStack(alignment: .top, spacing: 0) {
             metricColumn(
                 title: "Down",
-                value: TrafficFormatting.bitsPerSecond(totalIncomingBytesPerSecond(snapshot)),
+                value: TrafficFormatting.bitsPerSecond(snapshot.apps.totalIncomingBytesPerSecond()),
                 subtitle: appEvidenceSubtitle(snapshot),
                 accent: theme.warning,
                 theme: theme
@@ -14,7 +14,7 @@ extension PopoverView {
             metricDivider(theme: theme)
             metricColumn(
                 title: "Up",
-                value: TrafficFormatting.bitsPerSecond(totalOutgoingBytesPerSecond(snapshot)),
+                value: TrafficFormatting.bitsPerSecond(snapshot.apps.totalOutgoingBytesPerSecond()),
                 subtitle: appEvidenceSubtitle(snapshot),
                 accent: theme.success,
                 theme: theme
@@ -22,8 +22,8 @@ extension PopoverView {
             metricDivider(theme: theme)
             metricColumn(
                 title: "Ping",
-                value: pingValue(snapshot),
-                subtitle: packetLossValue(snapshot),
+                value: pingValue(),
+                subtitle: packetLossValue(),
                 accent: theme.neutralAccent,
                 theme: theme
             )
@@ -69,8 +69,8 @@ extension PopoverView {
             .padding(.horizontal, 12)
     }
 
-    func pathStatus(_ snapshot: NetworkSnapshot, theme: NetScopePopoverTheme) -> some View {
-        let check = model.state.lastPathCheck?.pathCheck ?? snapshot.pathCheck
+    func pathStatus(theme: NetScopePopoverTheme) -> some View {
+        let check = model.state.lastPathCheck?.pathCheck
 
         return VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline) {
@@ -174,7 +174,7 @@ extension PopoverView {
         .padding(.vertical, 2)
     }
 
-    func baseline(_ snapshot: NetworkSnapshot, theme: NetScopePopoverTheme) -> some View {
+    func baseline(theme: NetScopePopoverTheme) -> some View {
         let assessment = model.state.baselineAssessment
         let message = model.baselineWarning ?? assessment?.summary ?? "Learning local baseline."
 
@@ -309,31 +309,19 @@ extension PopoverView {
         return "\(rssi) / \(noise) / \(rate) / \(channel)"
     }
 
-    func totalIncomingBytesPerSecond(_ snapshot: NetworkSnapshot) -> Int {
-        snapshot.apps.totalIncomingBytesPerSecond()
-    }
-
-    func totalOutgoingBytesPerSecond(_ snapshot: NetworkSnapshot) -> Int {
-        snapshot.apps.totalOutgoingBytesPerSecond()
-    }
-
-    func pingValue(_ snapshot: NetworkSnapshot) -> String {
-        guard let average = latestPing(snapshot)?.averageMilliseconds else {
+    func pingValue() -> String {
+        guard let average = model.state.lastPathCheck?.ping?.averageMilliseconds else {
             return "--"
         }
 
         return "\(TrafficFormatting.decimal(average)) ms"
     }
 
-    func packetLossValue(_ snapshot: NetworkSnapshot) -> String {
-        guard let packetLoss = latestPing(snapshot)?.packetLossPercent else {
+    func packetLossValue() -> String {
+        guard let packetLoss = model.state.lastPathCheck?.ping?.packetLossPercent else {
             return "not sampled"
         }
 
         return "\(TrafficFormatting.decimal(packetLoss))% loss"
-    }
-
-    func latestPing(_ snapshot: NetworkSnapshot) -> PingResult? {
-        model.state.lastPathCheck?.ping ?? snapshot.ping
     }
 }

@@ -27,52 +27,16 @@ public struct ObservationSession: Sendable {
         baseline
     }
 
-    @discardableResult
-    public mutating func applyInteractiveObservationSnapshot(_ snapshot: NetworkSnapshot) -> ObservationUpdate {
-        applyAppObservationSnapshot(
-            snapshot,
-            updatesBaseline: false,
-            recordsRollingTimestamp: false
-        )
+    public mutating func applyInteractiveObservationSnapshot(_ snapshot: NetworkSnapshot) {
+        _ = applyAppObservationSnapshot(snapshot, recordsBaseline: false)
     }
 
     @discardableResult
-    public mutating func applyRollingAppCounterSnapshot(_ snapshot: NetworkSnapshot) -> ObservationUpdate {
-        applyAppObservationSnapshot(
-            snapshot,
-            updatesBaseline: true,
-            recordsRollingTimestamp: true
-        )
+    public mutating func applyRollingAppCounterSnapshot(_ snapshot: NetworkSnapshot) -> Bool {
+        applyAppObservationSnapshot(snapshot, recordsBaseline: true)
     }
 
-    private mutating func applyAppObservationSnapshot(
-        _ snapshot: NetworkSnapshot,
-        updatesBaseline: Bool,
-        recordsRollingTimestamp: Bool
-    ) -> ObservationUpdate {
-        history.record(snapshot)
-        let nextCorrelation = history.correlation()
-        let nextBaselineAssessment = baseline.assess(apps: snapshot.apps, at: snapshot.capturedAt)
-        let baselineChanged = updatesBaseline
-            ? baseline.record(apps: snapshot.apps, at: snapshot.capturedAt)
-            : false
-
-        latestAppObservation = snapshot
-        state.snapshot = snapshot
-        state.correlation = nextCorrelation
-        state.baselineAssessment = nextBaselineAssessment
-        state.learnedBaselineAppCount = baseline.learnedAppCount
-        state.trafficTrend = history.trafficTrend()
-        if recordsRollingTimestamp {
-            state.lastRollingSampleAt = snapshot.capturedAt
-        }
-        updateStatus(correlation: nextCorrelation, now: snapshot.capturedAt)
-
-        return ObservationUpdate(state: state, baselineChanged: baselineChanged)
-    }
-
-    @discardableResult
-    public mutating func applyPathCheckSnapshot(_ snapshot: NetworkSnapshot) -> ObservationUpdate {
+    public mutating func applyPathCheckSnapshot(_ snapshot: NetworkSnapshot) {
         history.record(snapshot)
         let nextCorrelation = history.correlation()
         let nextBaselineAssessment = snapshot.appEvidenceSource.isFreshlySampled
@@ -85,31 +49,47 @@ public struct ObservationSession: Sendable {
         state.baselineAssessment = nextBaselineAssessment
         state.trafficTrend = history.trafficTrend()
         updateStatus(correlation: nextCorrelation, now: snapshot.capturedAt)
-
-        return ObservationUpdate(state: state, baselineChanged: false)
     }
 
-    @discardableResult
-    public mutating func clearBaseline() -> ObservationUpdate {
+    public mutating func clearBaseline() {
         baseline = TrafficBaseline()
         state.baselineAssessment = nil
         state.learnedBaselineAppCount = 0
+    }
 
-        return ObservationUpdate(state: state, baselineChanged: false)
+    private mutating func applyAppObservationSnapshot(
+        _ snapshot: NetworkSnapshot,
+        recordsBaseline: Bool
+    ) -> Bool {
+        history.record(snapshot)
+        let nextCorrelation = history.correlation()
+        let nextBaselineAssessment = baseline.assess(apps: snapshot.apps, at: snapshot.capturedAt)
+        let baselineChanged = recordsBaseline
+            ? baseline.record(apps: snapshot.apps, at: snapshot.capturedAt)
+            : false
+
+        latestAppObservation = snapshot
+        state.snapshot = snapshot
+        state.correlation = nextCorrelation
+        state.baselineAssessment = nextBaselineAssessment
+        state.learnedBaselineAppCount = baseline.learnedAppCount
+        state.trafficTrend = history.trafficTrend()
+        if recordsBaseline {
+            state.lastRollingSampleAt = snapshot.capturedAt
+        }
+        updateStatus(correlation: nextCorrelation, now: snapshot.capturedAt)
+
+        return baselineChanged
     }
 
     private mutating func updateStatus(correlation: RecentCorrelation?, now: Date) {
-        state.effectiveConfidence = statusPolicy.effectiveConfidence(
+        let evaluation = statusPolicy.evaluate(
             latestAppObservation: latestAppObservation,
             latestPathCheck: state.lastPathCheck,
             correlation: correlation,
             now: now
         )
-        state.status = statusPolicy.status(
-            latestAppObservation: latestAppObservation,
-            latestPathCheck: state.lastPathCheck,
-            correlation: correlation,
-            now: now
-        )
+        state.effectiveConfidence = evaluation.effectiveConfidence
+        state.status = evaluation.status
     }
 }

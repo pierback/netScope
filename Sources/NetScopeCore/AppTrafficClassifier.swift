@@ -15,19 +15,6 @@ public enum AppTrafficRole: String, Equatable, Sendable {
     case infrastructure
     case systemService
     case unknown
-
-    public var label: String {
-        switch self {
-        case .userApp:
-            return "User App"
-        case .infrastructure:
-            return "Infrastructure"
-        case .systemService:
-            return "System"
-        case .unknown:
-            return "Unknown"
-        }
-    }
 }
 
 public struct AppTrafficGroups: Equatable, Sendable {
@@ -71,11 +58,11 @@ public struct AppTrafficClassifier: Sendable {
     public func role(for displayName: String) -> AppTrafficRole {
         let name = normalized(displayName)
 
-        if infrastructureMarkers.contains(where: { name.contains($0) }) {
+        if isNetworkPathName(name) || Self.infrastructureServiceMarkers.contains(where: { name.contains($0) }) {
             return .infrastructure
         }
 
-        if systemServiceNames.contains(name) || systemServiceMarkers.contains(where: { name.contains($0) }) {
+        if Self.systemServiceNames.contains(name) || Self.systemServiceMarkers.contains(where: { name.contains($0) }) {
             return .systemService
         }
 
@@ -86,6 +73,10 @@ public struct AppTrafficClassifier: Sendable {
         return .userApp
     }
 
+    public func isNetworkPathApp(_ displayName: String) -> Bool {
+        isNetworkPathName(normalized(displayName))
+    }
+
     private func limited(_ classified: [ClassifiedAppTraffic], role: AppTrafficRole, limit: Int) -> [ClassifiedAppTraffic] {
         Array(classified.filter { $0.role == role }.prefix(limit))
     }
@@ -94,10 +85,12 @@ public struct AppTrafficClassifier: Sendable {
         displayName.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     }
 
-    private let infrastructureMarkers = [
+    private func isNetworkPathName(_ name: String) -> Bool {
+        Self.networkPathMarkers.contains { name.contains($0) }
+    }
+
+    private static let networkPathMarkers = [
         "zscaler",
-        "crowdstrike",
-        "falcon",
         "vpn",
         "tailscale",
         "wireguard",
@@ -111,10 +104,15 @@ public struct AppTrafficClassifier: Sendable {
         "warp",
         "little snitch",
         "littlesnitch",
+    ]
+
+    private static let infrastructureServiceMarkers = [
+        "crowdstrike",
+        "falcon",
         "jamf",
     ]
 
-    private let systemServiceNames = [
+    private static let systemServiceNames = [
         "mDNSResponder".lowercased(),
         "apsd",
         "cloudd",
@@ -127,7 +125,7 @@ public struct AppTrafficClassifier: Sendable {
         "kernel_task",
     ]
 
-    private let systemServiceMarkers = [
+    private static let systemServiceMarkers = [
         "com.apple.",
         "systemuiserver",
         "networkserviceproxy",

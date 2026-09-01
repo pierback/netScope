@@ -23,10 +23,6 @@ final class RollingObservationScheduler {
     }
 
     func start() {
-        guard PowerBudget.allowsRollingAppCounterSampling else {
-            return
-        }
-
         failureCount = 0
         schedule(after: PowerBudget.initialObservationDelaySeconds)
     }
@@ -36,10 +32,6 @@ final class RollingObservationScheduler {
     }
 
     func runNow() {
-        guard PowerBudget.allowsRollingAppCounterSampling else {
-            return
-        }
-
         runSample { [weak self] result in
             guard let self else {
                 return
@@ -49,11 +41,20 @@ final class RollingObservationScheduler {
         }
     }
 
-    private func schedule(after interval: TimeInterval) {
-        guard PowerBudget.allowsRollingAppCounterSampling else {
-            return
+    func nextInterval(after result: RollingSampleResult) -> TimeInterval {
+        switch result {
+        case .sampled:
+            failureCount = 0
+        case .skipped:
+            break
+        case .failed:
+            failureCount += 1
         }
 
+        return intervalForCurrentState()
+    }
+
+    private func schedule(after interval: TimeInterval) {
         cancelScheduledRun()
         let nextTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: false) { [weak self] _ in
             Task { @MainActor in
@@ -70,22 +71,9 @@ final class RollingObservationScheduler {
     }
 
     private func intervalForCurrentState() -> TimeInterval {
-        return observationPolicy.nextInterval(
+        observationPolicy.nextInterval(
             consecutiveFailures: failureCount,
             isPowerConstrained: isPowerConstrained()
         )
-    }
-
-    func nextInterval(after result: RollingSampleResult) -> TimeInterval {
-        switch result {
-        case .sampled:
-            failureCount = 0
-        case .skipped:
-            break
-        case .failed:
-            failureCount += 1
-        }
-
-        return intervalForCurrentState()
     }
 }

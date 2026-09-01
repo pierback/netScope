@@ -9,8 +9,6 @@ struct NetScopePopoverTheme {
     let bodyText: Color
     let panelSurface: Color
     let panelBorder: Color
-    let emphasizedPanelSurface: Color
-    let emphasizedPanelBorder: Color
     let controlSurface: Color
     let controlBorder: Color
     let rail: Color
@@ -32,8 +30,6 @@ struct NetScopePopoverTheme {
             bodyText = Color(red: 0.18, green: 0.20, blue: 0.25)
             panelSurface = Color.white.opacity(0.52)
             panelBorder = Color.white.opacity(0.74)
-            emphasizedPanelSurface = Color.white.opacity(0.66)
-            emphasizedPanelBorder = Color.white.opacity(0.86)
             controlSurface = Color.white.opacity(0.68)
             controlBorder = Color.white.opacity(0.88)
             rail = Color.black.opacity(0.07)
@@ -52,8 +48,6 @@ struct NetScopePopoverTheme {
             bodyText = Color(red: 0.90, green: 0.90, blue: 0.92)
             panelSurface = Color(red: 0.17, green: 0.17, blue: 0.18).opacity(0.58)
             panelBorder = Color.white.opacity(0.11)
-            emphasizedPanelSurface = Color(red: 0.17, green: 0.17, blue: 0.18).opacity(0.66)
-            emphasizedPanelBorder = Color.white.opacity(0.13)
             controlSurface = Color(red: 0.17, green: 0.17, blue: 0.18).opacity(0.72)
             controlBorder = Color.white.opacity(0.13)
             rail = Color(red: 0.23, green: 0.23, blue: 0.24).opacity(0.72)

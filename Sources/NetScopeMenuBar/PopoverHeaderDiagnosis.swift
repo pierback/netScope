@@ -43,7 +43,7 @@ extension PopoverView {
         }
 
         guard let snapshot = model.state.snapshot else {
-            return "Rolling counters every 60s · ping on path check"
+            return "Power-aware counters · ping on path check"
         }
 
         let timestamp = Self.headerTimeFormatter.string(from: snapshot.capturedAt)

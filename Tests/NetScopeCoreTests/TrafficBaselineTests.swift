@@ -38,6 +38,36 @@ import Testing
     #expect(baseline.recordsByAppName.isEmpty)
 }
 
+@Test func baselineRecordReturnsFalseWhenNewRecordIsImmediatelyPruned() {
+    let now = Date(timeIntervalSince1970: 1_800)
+    var baseline = TrafficBaseline(maximumAgeSeconds: 3_600, maximumApps: 1)
+    baseline.record(apps: [app("retained", down: 40_000, up: 40_000)], at: now)
+
+    let changed = baseline.record(
+        apps: [app("older", down: 40_000, up: 40_000)],
+        at: now.addingTimeInterval(-1)
+    )
+
+    #expect(changed == false)
+    #expect(baseline.recordsByAppName.count == 1)
+    #expect(baseline.recordsByAppName["retained"] != nil)
+}
+
+@Test func baselineRecordReturnsTrueWhenNewRecordReplacesExistingAtCapacity() {
+    let now = Date(timeIntervalSince1970: 1_900)
+    var baseline = TrafficBaseline(maximumAgeSeconds: 3_600, maximumApps: 1)
+    baseline.record(apps: [app("old", down: 40_000, up: 40_000)], at: now)
+
+    let changed = baseline.record(
+        apps: [app("new", down: 40_000, up: 40_000)],
+        at: now.addingTimeInterval(1)
+    )
+
+    #expect(changed)
+    #expect(baseline.recordsByAppName.count == 1)
+    #expect(baseline.recordsByAppName["new"] != nil)
+}
+
 @Test func baselineDoesNotCompareUntilEnoughSamplesExist() {
     let now = Date(timeIntervalSince1970: 2_000)
     var baseline = TrafficBaseline(maximumAgeSeconds: 3_600, maximumApps: 10)
@@ -126,7 +156,7 @@ import Testing
     #expect(!FileManager.default.fileExists(atPath: fileURL.path))
 }
 
-@Test func localBaselineStoreClampsPersistedCapsToRuntimeBudget() throws {
+@Test func localBaselineStoreUsesRuntimeCapsInsteadOfPersistedCaps() throws {
     let directory = FileManager.default.temporaryDirectory
         .appendingPathComponent("netscope-baseline-tests-\(UUID().uuidString)", isDirectory: true)
     let fileURL = directory.appendingPathComponent("baseline.json")

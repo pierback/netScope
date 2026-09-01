@@ -93,7 +93,7 @@ extension PopoverView {
 
                     Spacer(minLength: 8)
 
-                    Text(compactAppTraffic(app))
+                    Text(TrafficFormatting.appTraffic(app, style: .compact))
                         .font(NetScopeFont.medium(10.5))
                         .monospacedDigit()
                         .foregroundStyle(theme.secondaryText)
@@ -117,10 +117,6 @@ extension PopoverView {
             .padding(.bottom, 2)
         }
     }
-    func compactAppTraffic(_ app: AppTraffic) -> String {
-        TrafficFormatting.appTraffic(app, style: .compact)
-    }
-
     func progress(for app: AppTraffic, maxTraffic: Int) -> Double {
         guard maxTraffic > 0 else {
             return 0

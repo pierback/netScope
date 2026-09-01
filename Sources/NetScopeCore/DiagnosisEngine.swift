@@ -6,10 +6,9 @@ public struct DiagnosisEngine: Sendable {
     public func diagnose(evidence: DiagnosisEvidence) -> Diagnosis {
         let apps = evidence.apps
         let ping = evidence.pathCheck?.publicPing ?? evidence.ping
-        let topApps = apps
+        let topApps = Array(apps
             .sorted { $0.totalBytesPerSecond > $1.totalBytesPerSecond }
-            .prefix(5)
-            .map { $0 }
+            .prefix(5))
 
         let totalIn = apps.totalIncomingBytesPerSecond()
         let totalOut = apps.totalOutgoingBytesPerSecond()
@@ -17,7 +16,10 @@ public struct DiagnosisEngine: Sendable {
         let pingReason = ping.map(describePing)
         let pathReason = evidence.pathCheck?.summary
         let wifiReason = evidence.wifi?.summary
-        let activeProxyApp = topApps.first(where: isProxyOrVPNApp)
+        let appClassifier = AppTrafficClassifier()
+        let activeNetworkPathApp = topApps.first {
+            appClassifier.isNetworkPathApp($0.displayName)
+        }
         let canUseAppPressure = evidence.appEvidenceSource.isFreshlySampled
 
         guard let top = topApps.first else {
@@ -37,7 +39,7 @@ public struct DiagnosisEngine: Sendable {
             return Diagnosis(
                 kind: .noObservedPressure,
                 title: "No active TCP app traffic observed",
-                confidence: pingLooksBad(ping) ? .medium : .low,
+                confidence: ping?.indicatesPathProblem == true ? .medium : .low,
                 reasons: compact([
                     "nettop did not report meaningful TCP per-process traffic in this short sample.",
                     pingReason,
@@ -105,13 +107,13 @@ public struct DiagnosisEngine: Sendable {
             )
         }
 
-        if canUseAppPressure, pingLooksBad(ping), let activeProxyApp {
+        if canUseAppPressure, ping?.indicatesPathProblem == true, let activeNetworkPathApp {
             return Diagnosis(
-                kind: .infrastructurePathApp(appName: activeProxyApp.displayName),
-                title: "\(activeProxyApp.displayName) may be adding network latency",
+                kind: .infrastructurePathApp(appName: activeNetworkPathApp.displayName),
+                title: "\(activeNetworkPathApp.displayName) may be adding network latency",
                 confidence: .medium,
                 reasons: compact([
-                    "\(activeProxyApp.displayName) looks like a VPN, proxy, or network security app and is active in the sample.",
+                    "\(activeNetworkPathApp.displayName) looks like a VPN, proxy, or network security app and is active in the sample.",
                     pingReason,
                     pathReason,
                     wifiReason,
@@ -135,7 +137,7 @@ public struct DiagnosisEngine: Sendable {
             return wifiDiagnosis
         }
 
-        if pingLooksBad(ping) {
+        if ping?.indicatesPathProblem == true {
             return Diagnosis(
                 kind: .internetPath,
                 title: "Network path looks slow or unstable; no single app stands out",
@@ -248,7 +250,7 @@ public struct DiagnosisEngine: Sendable {
 
     private func describePing(_ ping: PingResult) -> String {
         let average = ping.averageMilliseconds.map { "\(TrafficFormatting.decimal($0)) ms avg" } ?? "no average latency"
-        return "Ping to \(ping.host): \(average), \(formatNumber(ping.packetLossPercent))% packet loss."
+        return "Ping to \(ping.host): \(average), \(TrafficFormatting.decimal(ping.packetLossPercent))% packet loss."
     }
 
     private func describeDNS(_ result: DNSLookupResult?) -> String? {
@@ -263,47 +265,7 @@ public struct DiagnosisEngine: Sendable {
         return "DNS lookup for \(result.domain): \(result.succeeded ? "succeeded" : "failed")."
     }
 
-    private func pingLooksBad(_ ping: PingResult?) -> Bool {
-        guard let ping else {
-            return false
-        }
-
-        if ping.packetLossPercent >= 5 {
-            return true
-        }
-
-        if let average = ping.averageMilliseconds, average >= 150 {
-            return true
-        }
-
-        return false
-    }
-
-    private func isProxyOrVPNApp(_ app: AppTraffic) -> Bool {
-        let name = app.displayName.lowercased()
-        let markers = [
-            "zscaler",
-            "vpn",
-            "tailscale",
-            "wireguard",
-            "proton",
-            "nordvpn",
-            "expressvpn",
-            "openvpn",
-            "globalprotect",
-            "anyconnect",
-            "cloudflare warp",
-            "warp",
-        ]
-
-        return markers.contains { name.contains($0) }
-    }
-
     private func compact(_ values: [String?]) -> [String] {
         values.compactMap { $0 }
-    }
-
-    private func formatNumber(_ value: Double) -> String {
-        TrafficFormatting.decimal(value)
     }
 }

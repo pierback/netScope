@@ -46,6 +46,10 @@ public struct PingResult: Equatable, Sendable {
         self.packetLossPercent = packetLossPercent
         self.averageMilliseconds = averageMilliseconds
     }
+
+    public var indicatesPathProblem: Bool {
+        packetLossPercent >= 5 || averageMilliseconds.map { $0 >= 150 } == true
+    }
 }
 
 public struct DNSLookupResult: Equatable, Sendable {

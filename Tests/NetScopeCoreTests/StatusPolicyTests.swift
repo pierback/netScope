@@ -19,7 +19,6 @@ import Testing
     let policy = StatusPolicy()
 
     #expect(policy.effectiveConfidence(for: diagnosis, correlation: correlation) == .low)
-    #expect(policy.status(for: diagnosis, correlation: correlation) == .normal)
 }
 
 @Test func recentCorrelationRaisesMatchingAppPressureDiagnosis() {
@@ -46,7 +45,6 @@ import Testing
     let policy = StatusPolicy()
 
     #expect(policy.effectiveConfidence(for: diagnosis, correlation: correlation) == .high)
-    #expect(policy.status(for: diagnosis, correlation: correlation) == .likelyIssue)
 }
 
 @Test func recentCorrelationDoesNotRaiseDifferentCurrentApp() {
@@ -66,7 +64,6 @@ import Testing
     let policy = StatusPolicy()
 
     #expect(policy.effectiveConfidence(for: diagnosis, correlation: correlation) == .medium)
-    #expect(policy.status(for: diagnosis, correlation: correlation) == .possiblePressure)
 }
 
 @Test func rollingSampleDoesNotClearRecentDNSPathStatus() {
@@ -96,12 +93,12 @@ import Testing
 
     let policy = StatusPolicy()
 
-    #expect(policy.status(
+    #expect(policy.evaluate(
         latestAppObservation: appSnapshot,
         latestPathCheck: pathSnapshot,
         correlation: nil,
         now: now.addingTimeInterval(60)
-    ) == .possiblePressure)
+    ).status == .possiblePressure)
 }
 
 @Test func rollingSampleDoesNotClearRecentInternetPathStatus() {
@@ -131,12 +128,12 @@ import Testing
 
     let policy = StatusPolicy()
 
-    #expect(policy.status(
+    #expect(policy.evaluate(
         latestAppObservation: appSnapshot,
         latestPathCheck: pathSnapshot,
         correlation: nil,
         now: now.addingTimeInterval(60)
-    ) == .possiblePressure)
+    ).status == .possiblePressure)
 }
 
 @Test func expiredPathCheckDoesNotDriveStatusWhenNoAppObservationExists() {
@@ -155,12 +152,12 @@ import Testing
 
     let policy = StatusPolicy()
 
-    #expect(policy.status(
+    #expect(policy.evaluate(
         latestAppObservation: nil,
         latestPathCheck: expiredPathSnapshot,
         correlation: nil,
         now: now
-    ) == .normal)
+    ).status == .normal)
 }
 
 @Test func expiredPathCheckFallsBackToLatestAppObservation() {
@@ -190,12 +187,12 @@ import Testing
 
     let policy = StatusPolicy()
 
-    #expect(policy.status(
+    #expect(policy.evaluate(
         latestAppObservation: appSnapshot,
         latestPathCheck: expiredPathSnapshot,
         correlation: nil,
         now: now
-    ) == .normal)
+    ).status == .normal)
 }
 
 private func snapshot(at date: Date, kind: SnapshotKind, diagnosis: Diagnosis) -> NetworkSnapshot {

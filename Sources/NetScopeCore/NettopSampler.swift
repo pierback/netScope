@@ -72,10 +72,6 @@ public enum NettopOutputParser {
             .contains { $0.hasPrefix(",bytes_in,bytes_out") }
     }
 
-    public static func parseLastSample(_ output: String) -> [AppTraffic] {
-        parseLastSampleResult(output).apps
-    }
-
     public static func parseLastSampleResult(_ output: String) -> NettopParseResult {
         let lines = output
             .split(whereSeparator: \.isNewline)

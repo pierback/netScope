@@ -13,7 +13,7 @@ import Testing
     Idle.12,0,0,0,
     """
 
-    let apps = NettopOutputParser.parseLastSample(output)
+    let apps = NettopOutputParser.parseLastSampleResult(output).apps
 
     #expect(apps == [
         AppTraffic(

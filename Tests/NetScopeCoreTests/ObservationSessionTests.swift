@@ -18,14 +18,14 @@ import Testing
     var session = ObservationSession()
     let snapshot = appSnapshot(at: now, appName: "codex", confidence: .medium)
 
-    let update = session.applyRollingAppCounterSnapshot(snapshot)
+    let baselineChanged = session.applyRollingAppCounterSnapshot(snapshot)
 
-    #expect(update.baselineChanged)
-    #expect(update.state.snapshot == snapshot)
-    #expect(update.state.lastRollingSampleAt == now)
-    #expect(update.state.learnedBaselineAppCount == 1)
-    #expect(update.state.trafficTrend.count == 1)
-    #expect(update.state.status == .possiblePressure)
+    #expect(baselineChanged)
+    #expect(session.state.snapshot == snapshot)
+    #expect(session.state.lastRollingSampleAt == now)
+    #expect(session.state.learnedBaselineAppCount == 1)
+    #expect(session.state.trafficTrend.count == 1)
+    #expect(session.state.status == .possiblePressure)
     #expect(session.latestAppObservationForPathCheck == snapshot)
     #expect(session.baselineForPersistence.learnedAppCount == 1)
 }
@@ -35,11 +35,11 @@ import Testing
     var session = ObservationSession()
 
     session.applyRollingAppCounterSnapshot(appSnapshot(at: now, appName: "Dropbox", confidence: .medium))
-    let update = session.applyRollingAppCounterSnapshot(appSnapshot(at: now.addingTimeInterval(60), appName: "Dropbox", confidence: .medium))
+    session.applyRollingAppCounterSnapshot(appSnapshot(at: now.addingTimeInterval(60), appName: "Dropbox", confidence: .medium))
 
-    #expect(update.state.correlation?.appName == "Dropbox")
-    #expect(update.state.effectiveConfidence == .high)
-    #expect(update.state.status == .likelyIssue)
+    #expect(session.state.correlation?.appName == "Dropbox")
+    #expect(session.state.effectiveConfidence == .high)
+    #expect(session.state.status == .likelyIssue)
 }
 
 @Test func interactiveObservationReusesBaselineWithoutRecordingRollingSample() {
@@ -48,7 +48,7 @@ import Testing
     baseline.record(apps: [app("codex", down: 40_000, up: 40_000)], at: now.addingTimeInterval(-60))
     var session = ObservationSession(baseline: baseline)
 
-    let update = session.applyInteractiveObservationSnapshot(
+    session.applyInteractiveObservationSnapshot(
         appSnapshot(
             at: now,
             appName: "codex",
@@ -57,10 +57,9 @@ import Testing
         )
     )
 
-    #expect(!update.baselineChanged)
-    #expect(update.state.snapshot?.kind == .interactive)
-    #expect(update.state.lastRollingSampleAt == nil)
-    #expect(update.state.learnedBaselineAppCount == 1)
+    #expect(session.state.snapshot?.kind == .interactive)
+    #expect(session.state.lastRollingSampleAt == nil)
+    #expect(session.state.learnedBaselineAppCount == 1)
     #expect(session.latestAppObservationForPathCheck?.kind == .interactive)
     #expect(session.baselineForPersistence.learnedAppCount == 1)
 }
@@ -81,12 +80,11 @@ import Testing
             topApps: []
         )
     )
-    let update = session.applyPathCheckSnapshot(pathSnapshot)
+    session.applyPathCheckSnapshot(pathSnapshot)
 
-    #expect(!update.baselineChanged)
-    #expect(update.state.snapshot == pathSnapshot)
-    #expect(update.state.lastPathCheck == pathSnapshot)
-    #expect(update.state.status == .possiblePressure)
+    #expect(session.state.snapshot == pathSnapshot)
+    #expect(session.state.lastPathCheck == pathSnapshot)
+    #expect(session.state.status == .possiblePressure)
     #expect(session.latestAppObservationForPathCheck == appObservation)
     #expect(session.baselineForPersistence.learnedAppCount == 1)
 }
@@ -106,15 +104,15 @@ import Testing
     )
 
     session.applyPathCheckSnapshot(pathSnapshot)
-    let update = session.applyRollingAppCounterSnapshot(appSnapshot(
+    session.applyRollingAppCounterSnapshot(appSnapshot(
         at: now.addingTimeInterval(60),
         appName: "codex",
         confidence: .low,
         diagnosisKind: .noObservedPressure
     ))
 
-    #expect(update.state.lastPathCheck == pathSnapshot)
-    #expect(update.state.status == .possiblePressure)
+    #expect(session.state.lastPathCheck == pathSnapshot)
+    #expect(session.state.status == .possiblePressure)
 }
 
 @Test func pathCheckWithReusedAppEvidenceDoesNotCreateCorrelation() {
@@ -136,9 +134,9 @@ import Testing
         appEvidenceSource: .reusedFromSnapshot(now),
         appObservationID: observationID
     )
-    let update = session.applyPathCheckSnapshot(reusedPathSnapshot)
+    session.applyPathCheckSnapshot(reusedPathSnapshot)
 
-    #expect(update.state.correlation == nil)
+    #expect(session.state.correlation == nil)
 }
 
 @Test func clearBaselineResetsBaselineStateOnly() {
@@ -147,12 +145,11 @@ import Testing
     let snapshot = appSnapshot(at: now, appName: "codex", confidence: .medium)
     session.applyRollingAppCounterSnapshot(snapshot)
 
-    let update = session.clearBaseline()
+    session.clearBaseline()
 
-    #expect(!update.baselineChanged)
-    #expect(update.state.snapshot == snapshot)
-    #expect(update.state.baselineAssessment == nil)
-    #expect(update.state.learnedBaselineAppCount == 0)
+    #expect(session.state.snapshot == snapshot)
+    #expect(session.state.baselineAssessment == nil)
+    #expect(session.state.learnedBaselineAppCount == 0)
     #expect(session.baselineForPersistence.learnedAppCount == 0)
 }
 
