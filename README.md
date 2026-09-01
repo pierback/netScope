@@ -121,3 +121,7 @@ Out of scope for now:
 - Background ping/speed probes.
 - Long `networkQuality` speed tests in the default diagnostic path.
 - Persisted raw per-sample traffic logs.
+
+## License
+
+NetScope is available under the [MIT License](LICENSE).
