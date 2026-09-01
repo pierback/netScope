@@ -1,14 +1,13 @@
 # NetScope
 
-NetScope is a local macOS network diagnosis utility. The first version is a CLI diagnostic engine that samples per-process network deltas and tells you whether one app is the likely source of current network pressure.
+NetScope is a lightweight macOS menu bar utility that helps explain a slow connection. It samples per-process network deltas, separates user apps from background infrastructure, checks the local and public network path on demand, and reports the evidence behind each diagnosis. A CLI exposes the same diagnostic engine for terminal use.
 
 ## Assumptions
 
 - The first user is the person sitting at this Mac when the internet feels slow.
 - The most valuable first answer is app-level attribution: "this app is using most upload/download right now."
 - The app should report likelihood and evidence, not pretend to prove perfect causality.
-- The first implementation can be a CLI because the diagnostic engine matters more than the menu bar shell.
-- A future menu bar app should call the same `NetScopeCore` module rather than duplicating diagnosis logic.
+- The CLI and menu bar app should use the same `NetScopeCore` module rather than duplicate diagnosis logic.
 - Avoiding Mac slowdown and battery drain is a hard product requirement.
 - No backward compatibility is needed; this is a new hard-cutover project.
 
@@ -59,6 +58,23 @@ It does not store packet contents, URLs, hostnames, remote IPs, browser tabs, DN
 
 ## Run
 
+NetScope requires macOS 14 or later and a Swift toolchain compatible with the version declared in `Package.swift`.
+
+To run the menu bar app during development:
+
+```bash
+swift run NetScopeMenuBar
+```
+
+To build and open a local app bundle:
+
+```bash
+./scripts/package-app.sh
+open .build/NetScope.app
+```
+
+To run a one-shot diagnosis in the terminal:
+
 ```bash
 swift run netScope
 ```
@@ -67,24 +83,13 @@ Run it while the connection feels slow. The output includes the current diagnosi
 
 The command exits after one on-demand full-check snapshot.
 
-## Menu Bar App
-
-```bash
-swift run NetScopeMenuBar
-```
+## Menu Bar Behavior
 
 The menu bar app uses the same `NetScopeCore` diagnosis path. Opening the popover starts lightweight observation. Clicking refresh first captures a fresh app-counter + Wi-Fi observation, then runs a bounded path check: default gateway ping, public ping, and one DNS lookup. While the app is running, NetScope records rolling app-counter samples at the conservative interval in `PowerBudget.rollingAppCounterSampleSeconds`. Those rolling samples do not ping, run a speed test, inspect packets, or write raw logs.
 
 Rolling app-counter samples also update the bounded local baseline. Path checks compare the current counters to that learned baseline but do not add duplicate app-counter samples.
 
 The popover groups observed traffic into user apps, infrastructure, system services, and unknown background processes. It also shows a compact trend line from the bounded in-memory history.
-
-To build a local `.app` bundle:
-
-```bash
-./scripts/package-app.sh
-open .build/NetScope.app
-```
 
 ## Product Scope
 
